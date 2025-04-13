@@ -1,3 +1,5 @@
+mod deck;
+
 #[macro_use]
 extern crate rocket;
 
@@ -22,7 +24,7 @@ pub mod core {
 
 use user::db::mongo::user_mongo::UserMongo;
 use dotenv::dotenv;
-use std::env;
+// use std::env;
 use user::service::{
     UserService, 
     UserServiceTrait};
@@ -31,8 +33,10 @@ use user::service::{
 async fn rocket() -> _ {
     dotenv().ok();
 
-    let mongo_uri = env::var("MONGO_DB_URI").expect("MONGO_URI not found in environment variables");
-    let mongo_db_name = env::var("MONGO_DB_NAME").expect("MONGO_DB_NAME not found in environment variables");
+    // let mongo_uri = env::var("MONGO_DB_URI").expect("MONGO_URI not found in environment variables");
+    // let mongo_db_name = env::var("MONGO_DB_NAME").expect("MONGO_DB_NAME not found in environment variables");
+    let mongo_uri = String::from("mongodb://localhost:27017");
+    let mongo_db_name = String::from("user");
     let mongo_repo = UserMongo::new(&mongo_uri, &mongo_db_name).await.unwrap();
     let user_service: Box<dyn UserServiceTrait> = Box::new(UserService::new(Box::new(mongo_repo)));
 

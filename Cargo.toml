@@ -12,6 +12,15 @@ rocket = { version = "0.5.1", features = ["json"] }
 mongodb = "2.8"
 bcrypt = "0.15.0"
 dotenv = "0.15.0"
+barnett-smart-card-protocol = { git = "https://github.com/geometryxyz/mental-poker.git" }
+starknet-curve = { git = "ssh://git@github.com/geometryresearch/proof-toolbox.git" }
+ark-ec = "0.3.0"
+rand = "0.8.4"
+rand_chacha = "0.3.1"
+rand_core = "0.6.4"
+bincode = "1.3.3"
+ark-serialize = "0.5.0"
+proof-essentials = { git = "ssh://git@github.com/geometryresearch/proof-toolbox.git" }
 
 [dev-dependencies]
 mockall = "0.12.1"
