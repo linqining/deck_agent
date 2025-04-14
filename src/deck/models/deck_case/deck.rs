@@ -26,8 +26,7 @@ pub struct SetUpDeckResponse{
     pub user_id:String,
     pub game_id:String,
     pub game_user_id:String,
-    pub user_public_key:String,
-    // todo return proof here
+    pub user_public_key:Vec<u8>,
     pub user_key_proof:Vec<u8>,
 }
 

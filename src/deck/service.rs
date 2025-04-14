@@ -1,5 +1,6 @@
 use ark_ec::group::Group;
 use ark_ec::ProjectiveCurve;
+use ark_ec::short_weierstrass_jacobian::GroupAffine;
 use barnett_smart_card_protocol::BarnettSmartProtocol;
 use barnett_smart_card_protocol::discrete_log_cards::{ DLCards, Parameters};
 use bincode::Options;
@@ -13,11 +14,12 @@ use crate::deck::models::deck_case::deck::SetUpDeckResponse;
 use ark_serialize::{CanonicalSerialize,CanonicalDeserialize};
 use asn1_der::typed::DerEncodable;
 use starknet_curve::{Affine, StarkwareParameters};
+use crate::key_export::key_export::{encode_public_key, decode_public_key, encode_proof, decode_proof};
 
-extern crate starknet_curve;
 use proof_essentials::homomorphic_encryption::{
     el_gamal, el_gamal::ElGamal, HomomorphicEncryptionScheme,
 };
+use rocket::http::hyper::body::Buf;
 use serde::{Serialize, Deserialize};
 type Curve = starknet_curve::Projective;
 type CardProtocol = barnett_smart_card_protocol::discrete_log_cards::DLCards<Curve>;
@@ -85,26 +87,31 @@ impl DeckServiceTrait for DeckService {
         };
 
         //TODO 用户对局信息存起来
-        let mut bytes = Vec::new();
-        if let Err(e)= pk.serialize_uncompressed(&mut bytes){
+
+
+        let mut encoded_pk = Vec::new();
+        if let Err(e) = encode_public_key(pk,&mut encoded_pk){
             return Err(DeckCustomError::GenericError(String::from("Failed to serialize pk")))
         }
-
-
-        // println!("encodepk{:?}",bytes);
-
+        // let restored_pk:GroupAffine<StarkwareParameters> = decode_public_key(encoded_pk).unwrap();
+        // println!("{:?}", restored_pk);
         let  game_user_info = set_up.game_user_id.clone().into_bytes();
 
-        let proof_key =match CardProtocol::prove_key_ownership(&mut restored_rng, &params, &pk, &sk, &game_user_info){
+        let proof =match CardProtocol::prove_key_ownership(&mut restored_rng, &params, &pk, &sk, &game_user_info){
             Ok(p) => p,
             Err(_e)=> return Err(DeckCustomError::InvalidSeed)
         };
-        let mut proof_bytes = Vec::new();
-        if let Err(e)= proof_key.serialize_uncompressed(&mut proof_bytes){
-            return Err(DeckCustomError::GenericError(String::from("Failed to serialize proof")))
+        println!("proof {:?}", proof);
+
+        let mut encoded_proof = Vec::new();
+        if let Err(_e) = encode_proof(proof,&mut encoded_proof){
+            return Err(DeckCustomError::GenericError(String::from("Failed to serialize pk")))
         }
-
-
+        //
+        // let restored_proof= decode_proof(&encoded_proof).unwrap();
+        // println!("restored_proof {:?}", restored_proof);
+        //
+        // println!("isequal {:?}", restored_proof.eq(&proof));
 
 
 
@@ -112,16 +119,14 @@ impl DeckServiceTrait for DeckService {
             user_id:set_up.user_id,
             game_id:set_up.game_id,
             game_user_id: set_up.game_user_id,
-            user_public_key:  pk.to_string(),
-            user_key_proof: proof_bytes,
+            user_public_key:  encoded_pk,
+            user_key_proof: encoded_proof,
         })
     }
 }
 
 #[cfg(test)]
 mod unit_tests {
-
-
 
 
 }
