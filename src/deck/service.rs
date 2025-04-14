@@ -100,7 +100,7 @@ impl DeckServiceTrait for DeckService {
             Err(_e)=> return Err(DeckCustomError::InvalidSeed)
         };
         let mut proof_bytes = Vec::new();
-        if let Err(e)= pk.serialize_uncompressed(&mut proof_bytes){
+        if let Err(e)= proof_key.serialize_uncompressed(&mut proof_bytes){
             return Err(DeckCustomError::GenericError(String::from("Failed to serialize proof")))
         }
 
