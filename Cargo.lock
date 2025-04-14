@@ -86,9 +86,9 @@ dependencies = [
  "ark-ec",
  "ark-ff",
  "ark-relations",
- "ark-serialize 0.3.0",
+ "ark-serialize",
  "ark-snark",
- "ark-std 0.3.0",
+ "ark-std",
  "blake2",
  "derivative",
  "digest 0.9.0",
@@ -101,8 +101,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dea978406c4b1ca13c2db2373b05cc55429c3575b8b21f1b9ee859aa5b03dd42"
 dependencies = [
  "ark-ff",
- "ark-serialize 0.3.0",
- "ark-std 0.3.0",
+ "ark-serialize",
+ "ark-std",
  "derivative",
  "num-traits",
  "rayon",
@@ -117,8 +117,8 @@ checksum = "6b3235cc41ee7a12aaaf2c575a2ad7b46713a8a50bda2fc3b003a04845c05dd6"
 dependencies = [
  "ark-ff-asm",
  "ark-ff-macros",
- "ark-serialize 0.3.0",
- "ark-std 0.3.0",
+ "ark-serialize",
+ "ark-std",
  "derivative",
  "num-bigint",
  "num-traits",
@@ -160,8 +160,8 @@ dependencies = [
  "ark-poly",
  "ark-poly-commit",
  "ark-relations",
- "ark-serialize 0.3.0",
- "ark-std 0.3.0",
+ "ark-serialize",
+ "ark-std",
  "derivative",
  "digest 0.9.0",
  "rand_chacha 0.3.1",
@@ -178,7 +178,7 @@ dependencies = [
  "ark-ff",
  "ark-r1cs-std",
  "ark-relations",
- "ark-std 0.3.0",
+ "ark-std",
  "derivative",
  "num-bigint",
  "num-integer",
@@ -193,8 +193,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b0f78f47537c2f15706db7e98fe64cc1711dbf9def81218194e17239e53e5aa"
 dependencies = [
  "ark-ff",
- "ark-serialize 0.3.0",
- "ark-std 0.3.0",
+ "ark-serialize",
+ "ark-std",
  "derivative",
  "hashbrown 0.11.2",
  "rayon",
@@ -211,8 +211,8 @@ dependencies = [
  "ark-nonnative-field",
  "ark-poly",
  "ark-relations",
- "ark-serialize 0.3.0",
- "ark-std 0.3.0",
+ "ark-serialize",
+ "ark-std",
  "derivative",
  "digest 0.9.0",
  "rayon",
@@ -228,7 +228,7 @@ dependencies = [
  "ark-ec",
  "ark-ff",
  "ark-relations",
- "ark-std 0.3.0",
+ "ark-std",
  "derivative",
  "num-bigint",
  "num-traits",
@@ -242,7 +242,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4cba4c1c99792a6834bd97f7fd76578ec2cd58d2afc5139a17e1d1bec65b38f6"
 dependencies = [
  "ark-ff",
- "ark-std 0.3.0",
+ "ark-std",
  "tracing",
  "tracing-subscriber 0.2.25",
 ]
@@ -254,20 +254,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d6c2b318ee6e10f8c2853e73a83adc0ccb88995aa978d8a3408d492ab2ee671"
 dependencies = [
  "ark-serialize-derive",
- "ark-std 0.3.0",
+ "ark-std",
  "digest 0.9.0",
-]
-
-[[package]]
-name = "ark-serialize"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f4d068aaf107ebcd7dfb52bc748f8030e0fc930ac8e360146ca54c1203088f7"
-dependencies = [
- "ark-std 0.5.0",
- "arrayvec",
- "digest 0.10.7",
- "num-bigint",
 ]
 
 [[package]]
@@ -289,7 +277,7 @@ checksum = "0dc3dff1a5f67a9c0b34df32b079752d8dd17f1e9d06253da0453db6c1b7cc8a"
 dependencies = [
  "ark-ff",
  "ark-relations",
- "ark-std 0.3.0",
+ "ark-std",
 ]
 
 [[package]]
@@ -304,20 +292,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "ark-std"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "246a225cc6131e9ee4f24619af0f19d67761fff15d7ccc22e42b80846e69449a"
-dependencies = [
- "num-traits",
- "rand 0.8.5",
-]
-
-[[package]]
-name = "arrayvec"
+name = "asn1_der"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
+checksum = "155a5a185e42c6b77ac7b88a15143d930a9e9727a5b7b77eed417404ab15c247"
 
 [[package]]
 name = "async-stream"
@@ -398,8 +376,8 @@ dependencies = [
  "ark-ec",
  "ark-ff",
  "ark-marlin",
- "ark-serialize 0.3.0",
- "ark-std 0.3.0",
+ "ark-serialize",
+ "ark-std",
  "blake2",
  "merlin",
  "proof-essentials",
@@ -866,12 +844,21 @@ dependencies = [
 name = "example_api"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "ark-crypto-primitives",
  "ark-ec",
- "ark-serialize 0.5.0",
+ "ark-ff",
+ "ark-marlin",
+ "ark-serialize",
+ "ark-std",
+ "asn1_der",
  "barnett-smart-card-protocol",
+ "base64 0.21.7",
  "bcrypt",
  "bincode",
+ "blake2",
  "dotenv",
+ "merlin",
  "mockall",
  "mongodb",
  "proof-essentials",
@@ -882,6 +869,7 @@ dependencies = [
  "serde",
  "serde_json",
  "starknet-curve",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -1963,8 +1951,8 @@ dependencies = [
  "ark-ec",
  "ark-ff",
  "ark-marlin",
- "ark-serialize 0.3.0",
- "ark-std 0.3.0",
+ "ark-serialize",
+ "ark-std",
  "blake2",
  "digest 0.9.0",
  "getrandom 0.2.15",
@@ -2595,8 +2583,8 @@ source = "git+ssh://git@github.com/geometryresearch/proof-toolbox.git#ada587360d
 dependencies = [
  "ark-ec",
  "ark-ff",
- "ark-serialize 0.3.0",
- "ark-std 0.3.0",
+ "ark-serialize",
+ "ark-std",
 ]
 
 [[package]]

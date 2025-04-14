@@ -1,4 +1,5 @@
 mod deck;
+mod key_export;
 
 #[macro_use]
 extern crate rocket;
@@ -28,6 +29,10 @@ use dotenv::dotenv;
 use user::service::{
     UserService, 
     UserServiceTrait};
+use deck::service::{
+    DeckService,
+    DeckServiceTrait,
+};
 
 #[launch]
 async fn rocket() -> _ {
@@ -39,10 +44,13 @@ async fn rocket() -> _ {
     let mongo_db_name = String::from("user");
     let mongo_repo = UserMongo::new(&mongo_uri, &mongo_db_name).await.unwrap();
     let user_service: Box<dyn UserServiceTrait> = Box::new(UserService::new(Box::new(mongo_repo)));
+    let deck_service: Box<dyn DeckServiceTrait> = Box::new(DeckService::new());
 
     rocket::build()
         .manage(user_service)
         .mount("/", routes![user::routes::get_by_id])
         .mount("/", routes![user::routes::create])
         .mount("/", routes![user::routes::delete])
+        .manage(deck_service)
+        .mount("/",routes![deck::routes::setup])
 }

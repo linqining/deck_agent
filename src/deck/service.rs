@@ -5,12 +5,13 @@ use barnett_smart_card_protocol::discrete_log_cards::{ DLCards, Parameters};
 use bincode::Options;
 use super::{models::{ deck_case::deck::{ SetUpDeckRequest}}, errors::DeckCustomError, repository::UserDbTrait};
 use rand_chacha::{ChaCha20Rng};
-use rand_core::{ SeedableRng};
+use rand_core::{RngCore, SeedableRng};
 use rocket::data::ToByteUnit;
 use rocket::futures::TryFutureExt;
 use rocket::yansi::Paint;
 use crate::deck::models::deck_case::deck::SetUpDeckResponse;
 use ark_serialize::{CanonicalSerialize,CanonicalDeserialize};
+use asn1_der::typed::DerEncodable;
 use starknet_curve::{Affine, StarkwareParameters};
 
 extern crate starknet_curve;
@@ -22,12 +23,11 @@ type Curve = starknet_curve::Projective;
 type CardProtocol = barnett_smart_card_protocol::discrete_log_cards::DLCards<Curve>;
 
 pub struct DeckService {
-    user_db: Box<dyn UserDbTrait>,
 }
 
 impl DeckService {
-    pub fn new(user_db: Box<dyn UserDbTrait>) -> Self {
-        DeckService { user_db }
+    pub fn new() -> Self {
+        DeckService {  }
     }
 }
 
@@ -60,6 +60,8 @@ impl DeckServiceTrait for DeckService {
         }
 
         let  rng = ChaCha20Rng::seed_from_u64(set_up.rng_seed);
+        let  rng = ChaCha20Rng::from_entropy();
+
         let seed = rng.get_seed();
 
         let serialized = bincode::serialize(&seed).unwrap();
@@ -82,13 +84,25 @@ impl DeckServiceTrait for DeckService {
             Err(_e)=> return Err(DeckCustomError::InvalidSeed)
         };
 
-        // let (pk, sk) =  CardProtocol::player_keygen(&mut restored_rng, &params).unwrap();
+        //TODO 用户对局信息存起来
+        let mut bytes = Vec::new();
+        if let Err(e)= pk.serialize_uncompressed(&mut bytes){
+            return Err(DeckCustomError::GenericError(String::from("Failed to serialize pk")))
+        }
+
+
+        // println!("encodepk{:?}",bytes);
 
         let  game_user_info = set_up.game_user_id.clone().into_bytes();
-        let _proof_key =match CardProtocol::prove_key_ownership(&mut restored_rng, &params, &pk, &sk, &game_user_info){
+
+        let proof_key =match CardProtocol::prove_key_ownership(&mut restored_rng, &params, &pk, &sk, &game_user_info){
             Ok(p) => p,
             Err(_e)=> return Err(DeckCustomError::InvalidSeed)
         };
+        let mut proof_bytes = Vec::new();
+        if let Err(e)= pk.serialize_uncompressed(&mut proof_bytes){
+            return Err(DeckCustomError::GenericError(String::from("Failed to serialize proof")))
+        }
 
 
 
@@ -99,7 +113,7 @@ impl DeckServiceTrait for DeckService {
             game_id:set_up.game_id,
             game_user_id: set_up.game_user_id,
             user_public_key:  pk.to_string(),
-            // user_key_proof: proof_bytes,
+            user_key_proof: proof_bytes,
         })
     }
 }
