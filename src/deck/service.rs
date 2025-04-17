@@ -21,15 +21,19 @@ use proof_essentials::homomorphic_encryption::{
 };
 use rocket::http::hyper::body::Buf;
 use serde::{Serialize, Deserialize};
+use rand::thread_rng;
+use crate::user::service::UserService;
+
 type Curve = starknet_curve::Projective;
 type CardProtocol = barnett_smart_card_protocol::discrete_log_cards::DLCards<Curve>;
 
 pub struct DeckService {
+    user_db: Box<dyn crate::user::repository::UserMemTrait>,
 }
 
 impl DeckService {
-    pub fn new() -> Self {
-        DeckService {  }
+    pub fn new(user_db: Box<dyn crate::user::repository::UserMemTrait>) -> Self {
+        DeckService { user_db }
     }
 }
 
@@ -61,27 +65,27 @@ impl DeckServiceTrait for DeckService {
             ));
         }
 
-        let  rng = ChaCha20Rng::seed_from_u64(set_up.rng_seed);
-        let  rng = ChaCha20Rng::from_entropy();
+        // let  rng = ChaCha20Rng::from_entropy();
+        // let seed = rng.get_seed();
+        // print!("seed{:?}",seed);
+        //
+        //
+        // let serialized = bincode::serialize(&set_up.rng_seed).unwrap();
+        // let deserialized: <ChaCha20Rng as SeedableRng>::Seed =
+        //     match bincode::deserialize(&serialized) {
+        //         Ok(v) => v,
+        //         Err(_e)=> return Err(DeckCustomError::InvalidSeed)
+        //     };
+        // let mut restored_rng = ChaCha20Rng::from_seed(deserialized);
 
-        let seed = rng.get_seed();
+        let rng = &mut thread_rng();
 
-        let serialized = bincode::serialize(&seed).unwrap();
-
-        let deserialized: <ChaCha20Rng as SeedableRng>::Seed =
-            match bincode::deserialize(&serialized) {
-                Ok(v) => v,
-                Err(_e)=> return Err(DeckCustomError::InvalidSeed)
-            };
-        let mut restored_rng = ChaCha20Rng::from_seed(deserialized);
-
-
-        let params= match   CardProtocol::setup(&mut restored_rng, 2, 26){
+        let params= match   CardProtocol::setup(rng, 2, 26){
             Ok(p) => p,
             Err(_e)=> return Err(DeckCustomError::InvalidSeed)
         };
 
-        let (pk, sk) = match CardProtocol::player_keygen(&mut restored_rng, &params){
+        let (pk, sk) = match CardProtocol::player_keygen(rng, &params){
             Ok(tuple) =>  tuple,
             Err(_e)=> return Err(DeckCustomError::InvalidSeed)
         };
@@ -90,14 +94,14 @@ impl DeckServiceTrait for DeckService {
 
 
         let mut encoded_pk = Vec::new();
-        if let Err(e) = encode_public_key(pk,&mut encoded_pk){
+        if let Err(_e) = encode_public_key(pk,&mut encoded_pk){
             return Err(DeckCustomError::GenericError(String::from("Failed to serialize pk")))
         }
         // let restored_pk:GroupAffine<StarkwareParameters> = decode_public_key(encoded_pk).unwrap();
         // println!("{:?}", restored_pk);
         let  game_user_info = set_up.game_user_id.clone().into_bytes();
 
-        let proof =match CardProtocol::prove_key_ownership(&mut restored_rng, &params, &pk, &sk, &game_user_info){
+        let proof =match CardProtocol::prove_key_ownership( rng, &params, &pk, &sk, &game_user_info){
             Ok(p) => p,
             Err(_e)=> return Err(DeckCustomError::InvalidSeed)
         };
@@ -113,8 +117,6 @@ impl DeckServiceTrait for DeckService {
         //
         // println!("isequal {:?}", restored_proof.eq(&proof));
 
-
-
         Ok(SetUpDeckResponse{
             user_id:set_up.user_id,
             game_id:set_up.game_id,
@@ -123,6 +125,10 @@ impl DeckServiceTrait for DeckService {
             user_key_proof: encoded_proof,
         })
     }
+
+    // async fn compute_aggregate_key(&self,set_up: SetUpDeckRequest) -> Result<SetUpDeckResponse, DeckCustomError>{
+    //
+    // }
 }
 
 #[cfg(test)]

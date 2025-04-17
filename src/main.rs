@@ -1,6 +1,5 @@
 mod deck;
 mod key_export;
-
 #[macro_use]
 extern crate rocket;
 
@@ -17,13 +16,19 @@ pub mod user {
         pub mod mock;
         pub mod mongo;
     }
+    pub mod mem{
+        pub mod user_memory;
+    }
 }
 
 pub mod core {
     pub mod api_response;
 }
 
+use std::future::IntoFuture;
+use user::mem::user_memory::UserMem;
 use user::db::mongo::user_mongo::UserMongo;
+
 use dotenv::dotenv;
 // use std::env;
 use user::service::{
@@ -43,8 +48,14 @@ async fn rocket() -> _ {
     let mongo_uri = String::from("mongodb://localhost:27017");
     let mongo_db_name = String::from("user");
     let mongo_repo = UserMongo::new(&mongo_uri, &mongo_db_name).await.unwrap();
-    let user_service: Box<dyn UserServiceTrait> = Box::new(UserService::new(Box::new(mongo_repo)));
-    let deck_service: Box<dyn DeckServiceTrait> = Box::new(DeckService::new());
+    let user_repo = Box::new(mongo_repo);
+    // TODO 暂时占用，后面再处理
+    let user_mongo_repo = UserMongo::new(&mongo_uri, &mongo_db_name).await.unwrap();
+
+    let user_mem_repo = Box::new(UserMem::new());
+
+    let user_service: Box<dyn UserServiceTrait> = Box::new(UserService::new(Box::new(user_mongo_repo)));
+    let deck_service: Box<dyn DeckServiceTrait> = Box::new(DeckService::new(user_mem_repo));
 
     rocket::build()
         .manage(user_service)
