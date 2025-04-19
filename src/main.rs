@@ -1,5 +1,7 @@
 mod deck;
 mod key_export;
+mod card;
+
 #[macro_use]
 extern crate rocket;
 

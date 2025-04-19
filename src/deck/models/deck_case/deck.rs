@@ -1,3 +1,4 @@
+use std::ffi::c_void;
 use serde::{Serialize, Deserialize};
 
 
@@ -40,17 +41,21 @@ pub struct ComputeAggregateKeyResponse{
     pub joined_key: Vec<u8>, // if accept other player's proof, return the joined key of all player
 }
 
-
 #[derive(Debug, Serialize, Deserialize)]
-pub struct VerifyKeyRequest{
-    pub user_public_key:Vec<u8>,
-    pub user_key_proof:Vec<u8>,
-    pub game_user_id:String,
+pub struct GenerateDeckRequest{
+    pub joined_key: Vec<u8>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct VerifyKeyResponse{
+pub struct Card {
+    pub masked_card: Vec<u8>,
+    pub proof:Vec<u8>,
 }
-
-
-
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Deck{
+    pub cards: Vec<Card>,
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GenerateDeckResponse{
+    pub deck: Deck,
+}
