@@ -12,12 +12,11 @@ use rand_core::{RngCore, SeedableRng};
 use rocket::data::ToByteUnit;
 use rocket::futures::TryFutureExt;
 use rocket::yansi::Paint;
-use crate::deck::models::deck_case::deck::{SetUpDeckResponse, ComputeAggregateKeyResponse,
-                                           GenerateDeckRequest, GenerateDeckResponse,Deck,Card as CardDTO};
+use crate::deck::models::deck_case::deck::{SetUpDeckResponse, ComputeAggregateKeyResponse, GenerateDeckRequest, GenerateDeckResponse, InitialDeck, MaskedCardAndProofDTO as CardDTO, ShuffleRequest, ShuffleResponse, VerifyShuffleRequest, VerifyShuffleResponse, ShuffledDeck};
 use ark_serialize::{CanonicalSerialize,CanonicalDeserialize};
 use asn1_der::typed::DerEncodable;
 use starknet_curve::{Affine, StarkwareParameters};
-use crate::key_export::key_export::{encode_public_key, decode_public_key, encode_proof, decode_proof, decode_masked_card, encode_masked_card, encode_masking_proof};
+use crate::serialize::serialize::{encode_public_key, decode_public_key, encode_proof, decode_proof, decode_masked_card, encode_masked_card, encode_masking_proof};
 
 use proof_essentials::homomorphic_encryption::{
     el_gamal, el_gamal::ElGamal, HomomorphicEncryptionScheme,
@@ -41,6 +40,8 @@ type RevealToken = barnett_smart_card_protocol::discrete_log_cards::RevealToken<
 type ProofKeyOwnership = schnorr_identification::proof::Proof<Curve>;
 type RemaskingProof = chaum_pedersen_dl_equality::proof::Proof<Curve>;
 type RevealProof = chaum_pedersen_dl_equality::proof::Proof<Curve>;
+use proof_essentials::utils::permutation::Permutation;
+use proof_essentials::utils::rand::sample_vector;
 
 pub struct DeckService {
     user_db: Box<dyn crate::user::repository::UserMemTrait>,
@@ -60,6 +61,10 @@ pub trait DeckServiceTrait: Send + Sync {
     async fn compute_aggregate_key(&self,compute_agg_key: ComputeAggregateKeyRequest)->Result<ComputeAggregateKeyResponse,DeckCustomError>;
 
     async fn generate_deck(&self, generate_deck_request: GenerateDeckRequest) -> Result<GenerateDeckResponse, DeckCustomError>;
+
+    async fn shuffle (&self, shuffle_request: ShuffleRequest) -> Result<ShuffleResponse, DeckCustomError>;
+
+    async fn verify_shuffle(&self, verify_shuffle_request: VerifyShuffleRequest) -> Result<VerifyShuffleResponse, DeckCustomError>;
 }
 
 #[async_trait]
@@ -178,8 +183,8 @@ impl DeckServiceTrait for DeckService {
             joined_key:encoded_pk,
         })
     }
-    // TODO calculate and verify initial deck
 
+    // TODO verify deck proof
     async fn generate_deck(&self, generate_deck_request: GenerateDeckRequest) -> Result<GenerateDeckResponse, DeckCustomError>{
         // Each player should run this computation and verify that all players agree on the initial deck
         let rng = &mut thread_rng();
@@ -204,28 +209,65 @@ impl DeckServiceTrait for DeckService {
         };
 
 
-        let mut cards:Vec<CardDTO> = Vec::with_capacity(deck_and_proofs.len());
-        for deck_and_proof in deck_and_proofs {
-            let mut encoded_card = Vec::new();
-            if let Err(e) = encode_masked_card(deck_and_proof.0,&mut encoded_card){
-                return Err(DeckCustomError::GenericError(format!("Failed to encode deck_and_proof: {:?}",e)))
-            };
-            let mut encoded_proof = Vec::new();
-            let key_proof = match encode_masking_proof(deck_and_proof.1,&mut encoded_proof) {
-                Ok(p) => p,
-                Err(_e) => return Err(DeckCustomError::InvalidProof)
-            };
-            cards.push(CardDTO{
-                masked_card: encoded_card,
-                proof:encoded_proof,
-            })
-        }
-        let deck = Deck{
-            cards:cards,
+        let deck_dto = match    InitialDeck::new(deck_and_proofs){
+            Ok(p)=>p,
+            Err(e)=>return Err(DeckCustomError::SerializationError(e.to_string()))
         };
+
         Ok(GenerateDeckResponse{
-            deck:deck,
+            deck:deck_dto,
         })
+    }
+    async fn shuffle(&self, shuffle_request: ShuffleRequest) -> Result<ShuffleResponse, DeckCustomError> {
+        let joined_key = match decode_public_key(shuffle_request.joined_key.clone()){
+            Ok(p) => p,
+            Err(_e)=> return Err(DeckCustomError::InvalidPublicKey)
+        };
+        let pmrng1 =&mut  thread_rng();
+        let maskrng1 =&mut  thread_rng();
+        let shufflerng1 = &mut thread_rng();
+        let rng = &mut thread_rng();
+        let parameters = match CardProtocol::setup(rng, 2, 26){
+            Ok(p) => p,
+            Err(_e)=> return Err(DeckCustomError::GenericError(String::from("Internal")))
+        };
+
+        let deck= match shuffle_request.deck.into_masked_card(){
+            Ok(p) => p,
+            Err(_e)=> return Err(DeckCustomError::InvalidProof)
+        };
+
+        let permutation = Permutation::new(pmrng1, 2 * 26);
+        let masking_factors: Vec<Scalar> = sample_vector(maskrng1, 2 * 26);
+        let (a_shuffled_deck, a_shuffle_proof) = match CardProtocol::shuffle_and_remask(
+            shufflerng1,
+            &parameters,
+            &joined_key,
+            &deck,
+            &masking_factors,
+            &permutation,
+        ){
+            Ok(p) => p,
+            Err(_e)=> return Err(DeckCustomError::InvalidProof)
+        };
+        let mut encoded_proof = Vec::new();
+        if let Err(e)= a_shuffle_proof.serialize_uncompressed(&mut encoded_proof){
+            return Err(DeckCustomError::SerializationError(e.to_string()))
+        };
+
+        let shuffle_deck_dto = match ShuffledDeck::new(a_shuffled_deck){
+            Ok(p) => p,
+            Err(_e)=> return Err(DeckCustomError::GenericError(String::from("Internal")))
+        };
+
+        Ok(ShuffleResponse{
+            deck: shuffle_deck_dto,
+            shuffle_proof:encoded_proof,
+        })
+    }
+
+    async fn verify_shuffle(&self,verify_shuffle_request: VerifyShuffleRequest) -> Result<VerifyShuffleResponse, DeckCustomError> {
+        todo!()
     }
 }
 

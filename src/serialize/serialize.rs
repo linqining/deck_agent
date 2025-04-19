@@ -17,6 +17,10 @@ type RevealProof = chaum_pedersen_dl_equality::proof::Proof<Curve>;
 use crate::deck::errors::DeckCustomError;
 
 
+use proof_essentials::utils::permutation::Permutation;
+use proof_essentials::utils::rand::sample_vector;
+
+
 use proof_essentials::zkp::{
     arguments::shuffle,
     proofs::{chaum_pedersen_dl_equality, schnorr_identification},

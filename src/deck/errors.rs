@@ -8,6 +8,7 @@ pub enum DeckCustomError {
     InvalidPublicKey,
     MissingFields(String),
     GenericError(String),
+    SerializationError(String),
 }
 
 impl fmt::Display for DeckCustomError {
@@ -17,6 +18,7 @@ impl fmt::Display for DeckCustomError {
             DeckCustomError::MissingFields(msg) => write!(f, "The following fields are missing: {}", msg),
             DeckCustomError::GenericError(msg) => write!(f, "An error ocurred: {}", msg),
             DeckCustomError::InvalidPublicKey => write!(f, "invalid public key"),
+            DeckCustomError::SerializationError(msg) => write!(f, "Serialization err: {}", msg),
         }
     }
 }
