@@ -12,7 +12,7 @@ use rand_core::{RngCore, SeedableRng};
 use rocket::data::ToByteUnit;
 use rocket::futures::TryFutureExt;
 use rocket::yansi::Paint;
-use crate::deck::models::deck_case::deck::{SetUpDeckResponse, ComputeAggregateKeyResponse, GenerateDeckRequest, GenerateDeckResponse, InitialDeck, MaskedCardAndProofDTO as CardDTO, ShuffleRequest, ShuffleResponse, VerifyShuffleRequest, VerifyShuffleResponse, ShuffledDeck};
+use crate::deck::models::deck_case::deck::{SetUpDeckResponse, ComputeAggregateKeyResponse, GenerateDeckRequest, GenerateDeckResponse, InitialDeck, MaskedCardAndProofDTO as CardDTO, ShuffleRequest, ShuffleResponse, VerifyShuffleRequest, VerifyShuffleResponse, ShuffledDeck, RevealCardsRequest, RevealCardsResponse, OpenCardsRequest, OpenCardsResponse};
 use ark_serialize::{CanonicalSerialize,CanonicalDeserialize};
 use asn1_der::typed::DerEncodable;
 use starknet_curve::{Affine, StarkwareParameters};
@@ -65,6 +65,10 @@ pub trait DeckServiceTrait: Send + Sync {
     async fn shuffle (&self, shuffle_request: ShuffleRequest) -> Result<ShuffleResponse, DeckCustomError>;
 
     async fn verify_shuffle(&self, verify_shuffle_request: VerifyShuffleRequest) -> Result<VerifyShuffleResponse, DeckCustomError>;
+
+    async fn reveal_cards(&self,reveal_cards_request:  RevealCardsRequest)->Result<RevealCardsResponse, DeckCustomError>;
+
+    async fn open_cards(&self,open_cards_request: OpenCardsRequest)->Result<OpenCardsResponse, DeckCustomError>;
 }
 
 #[async_trait]
@@ -113,6 +117,7 @@ impl DeckServiceTrait for DeckService {
             Ok(tuple) =>  tuple,
             Err(_e)=> return Err(DeckCustomError::InvalidPublicKey)
         };
+        let game_user = GameUser::new(set_up.game_user_id.clone(),set_up.user_id.clone(),pk,sk);
 
         //TODO 用户对局信息存起来
 
@@ -140,6 +145,10 @@ impl DeckServiceTrait for DeckService {
         // println!("restored_proof {:?}", restored_proof);
         //
         // println!("isequal {:?}", restored_proof.eq(&proof));
+
+        // if let Err(e)= self.user_db.create(set_up.game_user_id.clone().to_string(),User::new(){
+        //     return Err(DeckCustomError::GenericError())
+        // })
 
         Ok(SetUpDeckResponse{
             user_id:set_up.user_id,
@@ -300,8 +309,18 @@ impl DeckServiceTrait for DeckService {
         if  let Err(e)= CardProtocol::verify_shuffle(&parameters,&joined_key,&origin_deck,&shuffled_deck, &proof){
             return Err(DeckCustomError::InvalidProof)
         };
-        Ok(VerifyShuffleResponse{
-        })
+        Ok(VerifyShuffleResponse{})
+    }
+    async fn reveal_cards(&self,reveal_cards_request:  RevealCardsRequest)->Result<RevealCardsResponse, DeckCustomError>{
+        let shuffled_deck= match reveal_cards_request.shuffled_deck.into_masked_card(){
+            Ok(p) => p,
+            Err(_e)=> return Err(DeckCustomError::InvalidProof)
+        };
+        todo!()
+    }
+
+    async fn open_cards(&self,open_cards_request: OpenCardsRequest)->Result<OpenCardsResponse, DeckCustomError>{
+        todo!()
     }
 }
 
@@ -310,6 +329,8 @@ use ark_ff::{to_bytes, UniformRand};
 use proof_essentials::vector_commitment::pedersen::PedersenCommitment;
 use proof_essentials::zkp::arguments::shuffle;
 use proof_essentials::zkp::proofs::{chaum_pedersen_dl_equality, schnorr_identification};
+use crate::game_user::models::game_user::GameUser;
+use crate::user::models::user::User;
 
 fn encode_cards<R: Rng>(rng: &mut R, num_of_cards: usize) -> HashMap<Card, ClassicPlayingCard> {
     let mut map: HashMap<Card, ClassicPlayingCard> = HashMap::new();

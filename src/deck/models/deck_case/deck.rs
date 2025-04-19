@@ -4,6 +4,8 @@ use ark_ec::short_weierstrass_jacobian::GroupAffine;
 use ark_serialize::{CanonicalSerialize,CanonicalDeserialize, SWFlags, SerializationError};
 use proof_essentials::zkp::proofs::{chaum_pedersen_dl_equality, schnorr_identification};
 use serde::{Serialize, Deserialize};
+use crate::card::classic_card::ClassicPlayingCard;
+
 type Curve = starknet_curve::Projective;
 type CardProtocol = barnett_smart_card_protocol::discrete_log_cards::DLCards<Curve>;
 // type Card = barnett_smart_card_protocol::discrete_log_cards::Card<Curve>;
@@ -138,6 +140,11 @@ impl InitialDeck {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct OpenedCards {
+    pub cards: Vec<ClassicPlayingCard>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GenerateDeckResponse{
     pub deck: InitialDeck,
 }
@@ -163,3 +170,24 @@ pub struct VerifyShuffleRequest{
 pub struct VerifyShuffleResponse{
 
 }
+
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RevealCardsRequest{
+    pub shuffled_deck: ShuffledDeck,
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RevealCardsResponse{
+    pub shuffled_deck: ShuffledDeck,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OpenCardsRequest{
+    pub shuffled_deck: ShuffledDeck,
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OpenCardsResponse{
+    pub opened_cards: OpenedCards,
+}
+
+

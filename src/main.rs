@@ -1,6 +1,7 @@
 mod deck;
 mod serialize;
 mod card;
+mod game_user;
 
 #[macro_use]
 extern crate rocket;

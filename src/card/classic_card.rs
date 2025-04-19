@@ -1,6 +1,6 @@
+use serde::{Deserialize, Serialize};
 
-
-#[derive(PartialEq, Clone, Copy, Eq)]
+#[derive(PartialEq, Clone, Copy, Eq,Serialize, Deserialize)]
 pub enum Suite {
     Club,
     Diamond,
@@ -12,7 +12,7 @@ impl Suite {
     pub const VALUES: [Self; 4] = [Self::Club, Self::Diamond, Self::Heart, Self::Spade];
 }
 
-#[derive(PartialEq, PartialOrd, Clone, Copy, Eq)]
+#[derive(PartialEq, PartialOrd, Clone, Copy, Eq,Serialize, Deserialize)]
 pub enum Value {
     Two,
     Three,
@@ -47,7 +47,7 @@ impl Value {
     ];
 }
 
-#[derive(PartialEq, Clone, Eq, Copy)]
+#[derive(PartialEq, Clone, Eq, Copy,Serialize,Deserialize)]
 pub struct ClassicPlayingCard {
     value: Value,
     suite: Suite,
