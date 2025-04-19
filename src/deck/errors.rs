@@ -5,7 +5,7 @@ use std::error::Error;
 #[derive(PartialEq)]
 pub enum DeckCustomError {
     InvalidProof,
-    InvalidSeed,
+    InvalidPublicKey,
     MissingFields(String),
     GenericError(String),
 }
@@ -16,7 +16,7 @@ impl fmt::Display for DeckCustomError {
             DeckCustomError::InvalidProof => write!(f, "invalid proof error"),
             DeckCustomError::MissingFields(msg) => write!(f, "The following fields are missing: {}", msg),
             DeckCustomError::GenericError(msg) => write!(f, "An error ocurred: {}", msg),
-            DeckCustomError::InvalidSeed => write!(f, "invalid seed"),
+            DeckCustomError::InvalidPublicKey => write!(f, "invalid public key"),
         }
     }
 }

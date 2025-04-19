@@ -4,13 +4,15 @@ use ark_ec::short_weierstrass_jacobian::GroupAffine;
 use barnett_smart_card_protocol::BarnettSmartProtocol;
 use barnett_smart_card_protocol::discrete_log_cards::{ DLCards, Parameters};
 use bincode::Options;
-use super::{models::{ deck_case::deck::{ SetUpDeckRequest}}, errors::DeckCustomError, repository::UserDbTrait};
+use super::{models::{ deck_case::deck::{
+    SetUpDeckRequest,
+    ComputeAggregateKeyRequest,VerifyKeyRequest,VerifyKeyResponse}}, errors::DeckCustomError, repository::UserDbTrait};
 use rand_chacha::{ChaCha20Rng};
 use rand_core::{RngCore, SeedableRng};
 use rocket::data::ToByteUnit;
 use rocket::futures::TryFutureExt;
 use rocket::yansi::Paint;
-use crate::deck::models::deck_case::deck::SetUpDeckResponse;
+use crate::deck::models::deck_case::deck::{SetUpDeckResponse,ComputeAggregateKeyResponse};
 use ark_serialize::{CanonicalSerialize,CanonicalDeserialize};
 use asn1_der::typed::DerEncodable;
 use starknet_curve::{Affine, StarkwareParameters};
@@ -41,6 +43,8 @@ impl DeckService {
 #[async_trait]
 pub trait DeckServiceTrait: Send + Sync {
     async fn setup(&self,set_up: SetUpDeckRequest) -> Result<SetUpDeckResponse, DeckCustomError>;
+
+    async fn compute_aggregate_key(&self,compute_agg_key: ComputeAggregateKeyRequest)->Result<ComputeAggregateKeyResponse,DeckCustomError>;
 }
 
 #[async_trait]
@@ -82,12 +86,12 @@ impl DeckServiceTrait for DeckService {
 
         let params= match   CardProtocol::setup(rng, 2, 26){
             Ok(p) => p,
-            Err(_e)=> return Err(DeckCustomError::InvalidSeed)
+            Err(_e)=> return Err(DeckCustomError::InvalidProof)
         };
 
         let (pk, sk) = match CardProtocol::player_keygen(rng, &params){
             Ok(tuple) =>  tuple,
-            Err(_e)=> return Err(DeckCustomError::InvalidSeed)
+            Err(_e)=> return Err(DeckCustomError::InvalidPublicKey)
         };
 
         //TODO 用户对局信息存起来
@@ -103,7 +107,7 @@ impl DeckServiceTrait for DeckService {
 
         let proof =match CardProtocol::prove_key_ownership( rng, &params, &pk, &sk, &game_user_info){
             Ok(p) => p,
-            Err(_e)=> return Err(DeckCustomError::InvalidSeed)
+            Err(_e)=> return Err(DeckCustomError::InvalidProof)
         };
         println!("proof {:?}", proof);
 
@@ -125,10 +129,40 @@ impl DeckServiceTrait for DeckService {
             user_key_proof: encoded_proof,
         })
     }
+    async fn compute_aggregate_key(&self,compute_agg_key_request: ComputeAggregateKeyRequest)->Result<ComputeAggregateKeyResponse,DeckCustomError> {
+        let set_up_rng = &mut thread_rng();
+        let parameters = match CardProtocol::setup(set_up_rng, 2, 26){
+            Ok(p) => p,
+            Err(_e)=> return Err(DeckCustomError::GenericError(String::from("Internal")))
+        };
 
-    // async fn compute_aggregate_key(&self,set_up: SetUpDeckRequest) -> Result<SetUpDeckResponse, DeckCustomError>{
-    //
-    // }
+        let mut key_proof_info = Vec::with_capacity(compute_agg_key_request.players.len());
+        for player in compute_agg_key_request.players {
+            let public_key = match decode_public_key(player.public_key.clone()) {
+                Ok(p) => p,
+                Err(_e) => return Err(DeckCustomError::InvalidPublicKey)
+            };
+
+            let key_proof = match decode_proof(&player.proof) {
+                Ok(p) => p,
+                Err(_e) => return Err(DeckCustomError::InvalidProof)
+            };
+            key_proof_info.push((public_key, key_proof, player.game_user_id.clone().into_bytes()))
+        }
+
+        let joint_pk = match CardProtocol::compute_aggregate_key(&parameters, &key_proof_info){
+            Ok(p) => p,
+            Err(_e)=> return Err(DeckCustomError::InvalidProof)
+        };
+
+        let mut encoded_pk = Vec::new();
+        if let Err(_e) = encode_public_key(joint_pk,&mut encoded_pk){
+            return Err(DeckCustomError::GenericError(String::from("Failed to serialize pk")))
+        }
+        Ok(ComputeAggregateKeyResponse{
+            joined_key:encoded_pk,
+        })
+    }
 }
 
 #[cfg(test)]

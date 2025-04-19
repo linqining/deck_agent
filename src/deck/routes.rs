@@ -25,7 +25,8 @@ pub async fn setup(deck_service: &State<Box<dyn DeckServiceTrait>>, setup: Json<
             match err {
                 DeckCustomError::GenericError(msg) => return Err(status::Custom(Status::InternalServerError, Json(ErrorResponse { message: msg }))),
                 DeckCustomError::MissingFields(msg) => return Err(status::Custom(Status::BadRequest, Json(ErrorResponse { message: format!("The following properties are required: {}", msg) }))),
-                DeckCustomError::InvalidSeed => return Err(status::Custom(Status::BadRequest,Json(ErrorResponse{message: format!("invalid seed")}))),
+                DeckCustomError::InvalidPublicKey => return Err(status::Custom(Status::BadRequest,Json(ErrorResponse{message: format!("invalid public key")}))),
+                DeckCustomError::InvalidProof=>return Err(status::Custom(Status::BadRequest,Json(ErrorResponse{message: format!("invalid proof")}))),
                 _ => return Err(status::Custom(Status::InternalServerError, Json(ErrorResponse { message: err.to_string() }))),
             }
         }
