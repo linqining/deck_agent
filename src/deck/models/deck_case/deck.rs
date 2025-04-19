@@ -72,6 +72,36 @@ pub struct InitialDeck {
     pub cards: Vec<MaskedCardAndProofDTO>,
 }
 
+impl InitialDeck {
+    pub fn new(deck_and_proofs :Vec<(MaskedCard, RemaskingProof)> )->Result<Self,SerializationError>{
+        let mut cards:Vec<crate::deck::models::deck_case::deck::MaskedCardAndProofDTO> = Vec::with_capacity(deck_and_proofs.len());
+        for deck_and_proof in deck_and_proofs {
+            let mut encoded_card = Vec::new();
+            encode_masked_card(deck_and_proof.0,&mut encoded_card)?;
+            let mut encoded_proof = Vec::new();
+            encode_masking_proof(deck_and_proof.1,&mut encoded_proof)?;
+            cards.push(crate::deck::models::deck_case::deck::MaskedCardAndProofDTO {
+                masked_card: encoded_card,
+                proof:encoded_proof,
+            })
+        }
+
+        Ok(InitialDeck {
+            cards:cards,
+        })
+    }
+    pub fn into_masked_card(&self)-> Result<Vec<(MaskedCard, RemaskingProof)>,ark_serialize::SerializationError>{
+        let card_length = self.cards.len();
+        let mut cards =Vec::with_capacity(card_length);
+        for card in self.cards.clone().into_iter(){
+            let masked_card = decode_masked_card(card.masked_card)?;
+            let proof = decode_masking_proof(card.proof)?;
+            cards.push((masked_card, proof));
+        }
+        Ok(cards)
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize,Clone)]
 pub struct MaskedCardDTO {
     pub masked_card: Vec<u8>,
@@ -109,35 +139,7 @@ impl ShuffledDeck {
 }
 
 
-impl InitialDeck {
-    pub fn new(deck_and_proofs :Vec<(MaskedCard, RemaskingProof)> )->Result<Self,SerializationError>{
-        let mut cards:Vec<crate::deck::models::deck_case::deck::MaskedCardAndProofDTO> = Vec::with_capacity(deck_and_proofs.len());
-        for deck_and_proof in deck_and_proofs {
-            let mut encoded_card = Vec::new();
-            encode_masked_card(deck_and_proof.0,&mut encoded_card)?;
-            let mut encoded_proof = Vec::new();
-            encode_masking_proof(deck_and_proof.1,&mut encoded_proof)?;
-            cards.push(crate::deck::models::deck_case::deck::MaskedCardAndProofDTO {
-                masked_card: encoded_card,
-                proof:encoded_proof,
-            })
-        }
 
-        Ok(InitialDeck {
-            cards:cards,
-        })
-    }
-    pub fn into_masked_card(&self)-> Result<Vec<(MaskedCard, RemaskingProof)>,ark_serialize::SerializationError>{
-        let card_length = self.cards.len();
-        let mut cards =Vec::with_capacity(card_length);
-        for card in self.cards.clone().into_iter(){
-            let masked_card = decode_masked_card(card.masked_card)?;
-            let proof = decode_masking_proof(card.proof)?;
-            cards.push((masked_card, proof));
-        }
-        Ok(cards)
-    }
-}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OpenedCards {
@@ -174,11 +176,12 @@ pub struct VerifyShuffleResponse{
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RevealCardsRequest{
+    pub game_user_id:String,
     pub shuffled_deck: ShuffledDeck,
 }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RevealCardsResponse{
-    pub shuffled_deck: ShuffledDeck,
+    pub revealed_deck: RevealedDeck,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -190,4 +193,45 @@ pub struct OpenCardsResponse{
     pub opened_cards: OpenedCards,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RevealedDeck {
+    pub cards: Vec<RevealedCardAndProofDTO>,
+}
+
+#[derive(Debug, Serialize, Deserialize,Clone)]
+pub struct RevealedCardAndProofDTO {
+    pub revealed_card: Vec<u8>,
+    pub proof:Vec<u8>,
+}
+impl RevealedDeck {
+    pub fn new(deck_and_proofs :Vec<(RevealToken, RevealProof)> )->Result<Self,SerializationError>{
+        let mut cards:Vec<crate::deck::models::deck_case::deck::RevealedCardAndProofDTO> = Vec::with_capacity(deck_and_proofs.len());
+        for deck_and_proof in deck_and_proofs {
+            let mut revealed_card = Vec::new();
+            deck_and_proof.0.serialize_uncompressed(&mut revealed_card)?;
+
+            let mut encoded_proof = Vec::new();
+            encode_masking_proof(deck_and_proof.1,&mut encoded_proof)?;
+
+            cards.push(RevealedCardAndProofDTO {
+                revealed_card: revealed_card,
+                proof:encoded_proof,
+            })
+        }
+
+        Ok(RevealedDeck {
+            cards:cards,
+        })
+    }
+    pub fn into_masked_card(&self)-> Result<Vec<(RevealToken, RevealProof)>,ark_serialize::SerializationError>{
+        let card_length = self.cards.len();
+        let mut cards =Vec::with_capacity(card_length);
+        for card in self.cards.clone(){
+            let revealed_card = RevealToken::deserialize(&*card.revealed_card)?;
+            let revealed_proof = RevealProof::deserialize(&*card.proof)?;
+            cards.push((revealed_card, revealed_proof));
+        }
+        Ok(cards)
+    }
+}
 

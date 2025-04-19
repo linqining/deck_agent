@@ -41,6 +41,7 @@ use deck::service::{
     DeckService,
     DeckServiceTrait,
 };
+use crate::game_user::mem::game_user_mem::GameUserMem;
 
 #[launch]
 async fn rocket() -> _ {
@@ -55,10 +56,11 @@ async fn rocket() -> _ {
     // TODO 暂时占用，后面再处理
     let user_mongo_repo = UserMongo::new(&mongo_uri, &mongo_db_name).await.unwrap();
 
-    let user_mem_repo = Box::new(UserMem::new());
+
+    let game_user_mem_repo = Box::new(GameUserMem::new());
 
     let user_service: Box<dyn UserServiceTrait> = Box::new(UserService::new(Box::new(user_mongo_repo)));
-    let deck_service: Box<dyn DeckServiceTrait> = Box::new(DeckService::new(user_mem_repo));
+    let deck_service: Box<dyn DeckServiceTrait> = Box::new(DeckService::new(game_user_mem_repo));
 
     rocket::build()
         .manage(user_service)

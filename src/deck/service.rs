@@ -12,7 +12,7 @@ use rand_core::{RngCore, SeedableRng};
 use rocket::data::ToByteUnit;
 use rocket::futures::TryFutureExt;
 use rocket::yansi::Paint;
-use crate::deck::models::deck_case::deck::{SetUpDeckResponse, ComputeAggregateKeyResponse, GenerateDeckRequest, GenerateDeckResponse, InitialDeck, MaskedCardAndProofDTO as CardDTO, ShuffleRequest, ShuffleResponse, VerifyShuffleRequest, VerifyShuffleResponse, ShuffledDeck, RevealCardsRequest, RevealCardsResponse, OpenCardsRequest, OpenCardsResponse};
+use crate::deck::models::deck_case::deck::{SetUpDeckResponse, ComputeAggregateKeyResponse, GenerateDeckRequest, GenerateDeckResponse, InitialDeck, MaskedCardAndProofDTO as CardDTO, ShuffleRequest, ShuffleResponse, VerifyShuffleRequest, VerifyShuffleResponse, ShuffledDeck, RevealCardsRequest, RevealCardsResponse, OpenCardsRequest, OpenCardsResponse, RevealedDeck};
 use ark_serialize::{CanonicalSerialize,CanonicalDeserialize};
 use asn1_der::typed::DerEncodable;
 use starknet_curve::{Affine, StarkwareParameters};
@@ -28,7 +28,7 @@ use crate::user::service::UserService;
 use ark_std::{rand::Rng, One};
 type Scalar = starknet_curve::Fr;
 use std::collections::HashMap;
-
+use std::sync::Mutex;
 
 type Curve = starknet_curve::Projective;
 type CardProtocol = barnett_smart_card_protocol::discrete_log_cards::DLCards<Curve>;
@@ -42,14 +42,15 @@ type RemaskingProof = chaum_pedersen_dl_equality::proof::Proof<Curve>;
 type RevealProof = chaum_pedersen_dl_equality::proof::Proof<Curve>;
 use proof_essentials::utils::permutation::Permutation;
 use proof_essentials::utils::rand::sample_vector;
+use crate::game_user::repository::GameUserMemTrait;
 
 pub struct DeckService {
-    user_db: Box<dyn crate::user::repository::UserMemTrait>,
+    user_db: Mutex<HashMap<String, GameUser>>,
 }
 
 impl DeckService {
-    pub fn new(user_db: Box<dyn crate::user::repository::UserMemTrait>) -> Self {
-        DeckService { user_db }
+    pub fn new(user_db: Box<dyn GameUserMemTrait>) -> Self {
+        DeckService { user_db:Mutex::new(HashMap::new())}
     }
 }
 
@@ -149,6 +150,7 @@ impl DeckServiceTrait for DeckService {
         // if let Err(e)= self.user_db.create(set_up.game_user_id.clone().to_string(),User::new(){
         //     return Err(DeckCustomError::GenericError())
         // })
+        self.user_db.lock().unwrap().insert(set_up.game_user_id.clone(), game_user);
 
         Ok(SetUpDeckResponse{
             user_id:set_up.user_id,
@@ -316,7 +318,37 @@ impl DeckServiceTrait for DeckService {
             Ok(p) => p,
             Err(_e)=> return Err(DeckCustomError::InvalidProof)
         };
-        todo!()
+        let game_user_id = reveal_cards_request.game_user_id.clone();
+
+        let user_db = self.user_db.lock().unwrap(); // 守卫生命周期开始
+        let get_user_result = user_db.get(&game_user_id);      // 守卫未释放，引用有效
+        let user = match get_user_result{
+            Some(game_user) => game_user,
+            None => return Err(DeckCustomError::UserNotFound),
+        };
+        let user_private_key = user.private_key.clone();
+        let user_public_key = user.public_key.clone();
+        let rng = &mut thread_rng();
+        let parameters = match CardProtocol::setup(rng, 2, 26){
+            Ok(p) => p,
+            Err(_e)=> return Err(DeckCustomError::GenericError(String::from("Internal")))
+        };
+        let mut reveal_cards  =  Vec::with_capacity(shuffled_deck.len());
+
+        for masked_card in shuffled_deck{
+            let reveal_card = match CardProtocol::compute_reveal_token(rng,&parameters,&user_private_key,&user_public_key,&masked_card){
+                Ok(p) => p,
+                Err(_e)=> return Err(DeckCustomError::GenericError(String::from("Internal")))
+            };
+            reveal_cards.push(reveal_card);
+        }
+        let deck =match  RevealedDeck::new(reveal_cards){
+            Ok(p) => p,
+            Err(_e)=> return Err(DeckCustomError::SerializationError(String::from("Internal")))
+        };
+        Ok(RevealCardsResponse{
+            revealed_deck: deck,
+        })
     }
 
     async fn open_cards(&self,open_cards_request: OpenCardsRequest)->Result<OpenCardsResponse, DeckCustomError>{
@@ -330,6 +362,7 @@ use proof_essentials::vector_commitment::pedersen::PedersenCommitment;
 use proof_essentials::zkp::arguments::shuffle;
 use proof_essentials::zkp::proofs::{chaum_pedersen_dl_equality, schnorr_identification};
 use crate::game_user::models::game_user::GameUser;
+use crate::user::errors::CustomError;
 use crate::user::models::user::User;
 
 fn encode_cards<R: Rng>(rng: &mut R, num_of_cards: usize) -> HashMap<Card, ClassicPlayingCard> {
