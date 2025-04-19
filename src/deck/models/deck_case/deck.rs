@@ -155,6 +155,9 @@ pub struct ShuffleResponse{
 #[derive(Debug, Serialize, Deserialize)]
 pub struct VerifyShuffleRequest{
     pub proof: Vec<u8>,
+    pub joined_key: Vec<u8>,
+    pub origin_deck: ShuffledDeck,
+    pub shuffled_deck: ShuffledDeck,
 }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct VerifyShuffleResponse{

@@ -16,7 +16,7 @@ use crate::deck::models::deck_case::deck::{SetUpDeckResponse, ComputeAggregateKe
 use ark_serialize::{CanonicalSerialize,CanonicalDeserialize};
 use asn1_der::typed::DerEncodable;
 use starknet_curve::{Affine, StarkwareParameters};
-use crate::serialize::serialize::{encode_public_key, decode_public_key, encode_proof, decode_proof, decode_masked_card, encode_masked_card, encode_masking_proof};
+use crate::serialize::serialize::{encode_public_key, decode_public_key, encode_proof, decode_proof, decode_masked_card, encode_masked_card, encode_masking_proof, decode_shuffle_proof, encode_shuffle_proof};
 
 use proof_essentials::homomorphic_encryption::{
     el_gamal, el_gamal::ElGamal, HomomorphicEncryptionScheme,
@@ -255,6 +255,11 @@ impl DeckServiceTrait for DeckService {
             return Err(DeckCustomError::SerializationError(e.to_string()))
         };
 
+
+        if let Err(er)= encode_shuffle_proof(&a_shuffle_proof,&mut encoded_proof){
+            return Err(DeckCustomError::SerializationError(String::from("Failed to shuffle proof")))
+        }
+
         let shuffle_deck_dto = match ShuffledDeck::new(a_shuffled_deck){
             Ok(p) => p,
             Err(_e)=> return Err(DeckCustomError::GenericError(String::from("Internal")))
@@ -267,12 +272,43 @@ impl DeckServiceTrait for DeckService {
     }
 
     async fn verify_shuffle(&self,verify_shuffle_request: VerifyShuffleRequest) -> Result<VerifyShuffleResponse, DeckCustomError> {
-        todo!()
+       let proof = match  decode_shuffle_proof(verify_shuffle_request.proof){
+           Ok(p) => p,
+           Err(_e)=> return Err(DeckCustomError::InvalidProof)
+       };
+        let rng = &mut thread_rng();
+        let parameters = match CardProtocol::setup(rng, 2, 26){
+            Ok(p) => p,
+            Err(_e)=> return Err(DeckCustomError::GenericError(String::from("Internal")))
+        };
+
+        let joined_key = match decode_public_key(verify_shuffle_request.joined_key.clone()){
+            Ok(p) => p,
+            Err(_e)=> return Err(DeckCustomError::InvalidPublicKey)
+        };
+
+        let origin_deck= match verify_shuffle_request.origin_deck.into_masked_card(){
+            Ok(p) => p,
+            Err(_e)=> return Err(DeckCustomError::InvalidProof)
+        };
+
+        let shuffled_deck= match verify_shuffle_request.shuffled_deck.into_masked_card(){
+            Ok(p) => p,
+            Err(_e)=> return Err(DeckCustomError::InvalidProof)
+        };
+
+        if  let Err(e)= CardProtocol::verify_shuffle(&parameters,&joined_key,&origin_deck,&shuffled_deck, &proof){
+            return Err(DeckCustomError::InvalidProof)
+        };
+        Ok(VerifyShuffleResponse{
+        })
     }
 }
 
 use crate::card::classic_card::{Suite,ClassicPlayingCard,Value};
 use ark_ff::{to_bytes, UniformRand};
+use proof_essentials::vector_commitment::pedersen::PedersenCommitment;
+use proof_essentials::zkp::arguments::shuffle;
 use proof_essentials::zkp::proofs::{chaum_pedersen_dl_equality, schnorr_identification};
 
 fn encode_cards<R: Rng>(rng: &mut R, num_of_cards: usize) -> HashMap<Card, ClassicPlayingCard> {
