@@ -69,4 +69,5 @@ async fn rocket() -> _ {
         .mount("/", routes![user::routes::delete])
         .manage(deck_service)
         .mount("/",routes![deck::routes::setup])
+        .mount("/",routes![deck::routes::initialize])
 }

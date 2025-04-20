@@ -2,7 +2,7 @@ use rocket::response::status;
 use rocket::{ State, http::Status};
 use rocket::serde::json::Json;
 
-use crate::deck::models::deck_case::deck::{ SetUpDeckRequest, SetUpDeckResponse};
+use crate::deck::models::deck_case::deck::{InitialDeckRequest, InitialDeckResponse, SetUpDeckRequest, SetUpDeckResponse};
 use crate::user::service::UserServiceTrait;
 use crate::core::api_response::ErrorResponse;
 use crate::deck::errors::DeckCustomError;
@@ -37,19 +37,25 @@ pub async fn setup(deck_service: &State<Box<dyn DeckServiceTrait>>, setup: Json<
     })))
 }
 
-#[delete("/user/<id>")]
-pub async fn delete(user_service: &State<Box<dyn UserServiceTrait>>, id: &str) -> Result<status::Custom<()>, status::Custom<Json<ErrorResponse>>> {
-    let delete_result = user_service.delete(id).await;
-
-    if let Err(err) = delete_result {
-        match err {
-            CustomError::GenericError(msg) => return Err(status::Custom(Status::InternalServerError, Json(ErrorResponse { message: msg }))),
-            CustomError::MissingFields(msg) => return Err(status::Custom(Status::BadRequest, Json(ErrorResponse { message: format!("The following properties are required: {}", msg) }))),
-            _ => return Err(status::Custom(Status::InternalServerError, Json(ErrorResponse { message: err.to_string() }))),
+#[get("/deck/initialize")]
+pub async fn initialize(deck_service: &State<Box<dyn DeckServiceTrait>>, ) -> Result<status::Custom<Json<InitialDeckResponse>>, status::Custom<Json<ErrorResponse>>> {
+    let setup_result = deck_service.initial_deck(InitialDeckRequest{}).await;
+    let setup_response = match setup_result {
+        Ok(response) => response,
+        Err(err) => {
+            match err {
+                DeckCustomError::GenericError(msg) => return Err(status::Custom(Status::InternalServerError, Json(ErrorResponse { message: msg }))),
+                DeckCustomError::MissingFields(msg) => return Err(status::Custom(Status::BadRequest, Json(ErrorResponse { message: format!("The following properties are required: {}", msg) }))),
+                DeckCustomError::InvalidPublicKey => return Err(status::Custom(Status::BadRequest,Json(ErrorResponse{message: format!("invalid public key")}))),
+                DeckCustomError::InvalidProof=>return Err(status::Custom(Status::BadRequest,Json(ErrorResponse{message: format!("invalid proof")}))),
+                _ => return Err(status::Custom(Status::InternalServerError, Json(ErrorResponse { message: err.to_string() }))),
+            }
         }
-    }
+    };
 
-    Ok(status::Custom(Status::Ok, ()))
+    Ok(status::Custom(Status::Created, Json(InitialDeckResponse {
+        ..setup_response
+    })))
 }
 
 #[cfg(test)]

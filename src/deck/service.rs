@@ -12,7 +12,7 @@ use rand_core::{RngCore, SeedableRng};
 use rocket::data::ToByteUnit;
 use rocket::futures::TryFutureExt;
 use rocket::yansi::Paint;
-use crate::deck::models::deck_case::deck::{SetUpDeckResponse, ComputeAggregateKeyResponse, GenerateDeckRequest, GenerateDeckResponse, InitialDeck, MaskedCardAndProofDTO as CardDTO, ShuffleRequest, ShuffleResponse, VerifyShuffleRequest, VerifyShuffleResponse, ShuffledDeck, RevealCardsRequest, RevealCardsResponse, OpenCardsRequest, OpenCardsResponse, RevealedDeck, PeekCardsRequest, PeekCardsResponse, ReceiveAndRevealTokenRequest, ReceiveAndRevealTokenResponse};
+use crate::deck::models::deck_case::deck::{SetUpDeckResponse, ComputeAggregateKeyResponse, GenerateDeckRequest, GenerateDeckResponse, InitialDeck, MaskedCardAndProofDTO as CardDTO, ShuffleRequest, ShuffleResponse, VerifyShuffleRequest, VerifyShuffleResponse, ShuffledDeck, RevealCardsRequest, RevealCardsResponse, OpenCardsRequest, OpenCardsResponse, RevealedDeck, PeekCardsRequest, PeekCardsResponse, ReceiveAndRevealTokenRequest, ReceiveAndRevealTokenResponse, InitialDeckRequest, InitialDeckResponse, InitialCard};
 use ark_serialize::{CanonicalSerialize,CanonicalDeserialize};
 use asn1_der::typed::DerEncodable;
 use starknet_curve::{Affine, StarkwareParameters};
@@ -57,6 +57,9 @@ impl DeckService {
 
 #[async_trait]
 pub trait DeckServiceTrait: Send + Sync {
+    // return a initial game cards
+    async fn initial_deck(&self,initial_deck: InitialDeckRequest)->Result<InitialDeckResponse, DeckCustomError>;
+
     async fn setup(&self,set_up: SetUpDeckRequest) -> Result<SetUpDeckResponse, DeckCustomError>;
 
     async fn compute_aggregate_key(&self,compute_agg_key: ComputeAggregateKeyRequest)->Result<ComputeAggregateKeyResponse,DeckCustomError>;
@@ -79,6 +82,29 @@ pub trait DeckServiceTrait: Send + Sync {
 
 #[async_trait]
 impl DeckServiceTrait for DeckService {
+    async fn initial_deck(&self,initial_deck: InitialDeckRequest)->Result<InitialDeckResponse, DeckCustomError>{
+        // Each player should run this computation and verify that all players agree on the initial deck
+        let rng = &mut thread_rng();
+
+        let card_mapping = encode_cards(rng, 2*26);
+        let mut reveal_cards  =  Vec::with_capacity(card_mapping.len());
+        for card in card_mapping {
+            let mut encoded_card = Vec::new();
+            if let Err(e) = card.0.serialize_uncompressed(&mut encoded_card){
+                return Err(DeckCustomError::GenericError(String::from("Internal")))
+            };
+            reveal_cards.push(InitialCard{
+                classic_card: card.1,
+                card: encoded_card,
+            });
+        }
+        Ok(
+            InitialDeckResponse{
+                cards: reveal_cards,
+            }
+        )
+    }
+
     async fn setup(&self,set_up: SetUpDeckRequest) -> Result<SetUpDeckResponse, DeckCustomError> {
         let mut missing_properties: Vec<&str> = vec![];
         if set_up.user_id.is_empty() {
@@ -391,7 +417,7 @@ impl DeckServiceTrait for DeckService {
 
 
     async fn open_cards(&self,open_cards_request: OpenCardsRequest)->Result<OpenCardsResponse, DeckCustomError>{
-        todo!()
+        todo!();
         // let rng = &mut thread_rng();
         // let parameters = match CardProtocol::setup(rng, 2, 26){
         //     Ok(p) => p,

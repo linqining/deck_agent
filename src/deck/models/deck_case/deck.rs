@@ -14,10 +14,32 @@ type ProofKeyOwnership = schnorr_identification::proof::Proof<Curve>;
 type RemaskingProof = chaum_pedersen_dl_equality::proof::Proof<Curve>;
 type RevealProof = chaum_pedersen_dl_equality::proof::Proof<Curve>;
 use crate::deck::errors::DeckCustomError;
+use crate::game_user::models::game_user::GameUser;
 use crate::serialize::serialize::{decode_masked_card, decode_masking_proof, encode_masked_card, encode_masking_proof};
 
 type MaskedCard = barnett_smart_card_protocol::discrete_log_cards::MaskedCard<Curve>;
 type RevealToken = barnett_smart_card_protocol::discrete_log_cards::RevealToken<Curve>;
+type Card = barnett_smart_card_protocol::discrete_log_cards::Card<Curve>;
+
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct InitialDeckRequest {
+    // pub m:usize,
+    // pub n:usize,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct InitialCard{
+    pub classic_card: ClassicPlayingCard,
+    pub card: Vec<u8>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct InitialDeckResponse {
+    pub cards: Vec<InitialCard>,
+}
+
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SetUpDeckRequest{
