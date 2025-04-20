@@ -184,6 +184,20 @@ pub struct RevealCardsResponse{
     pub revealed_deck: RevealedDeck,
 }
 
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ReceiveAndRevealTokenRequest{
+    pub game_user_id:String,
+    pub received_cards: Vec<MaskedCardDTO>,
+    pub shuffled_deck: ShuffledDeck,
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ReceiveAndRevealTokenResponse{
+    pub revealed_deck: RevealedDeck,
+}
+
+
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OpenCardsRequest{
     pub shuffled_deck: ShuffledDeck,
@@ -200,20 +214,28 @@ pub struct RevealedDeck {
 
 #[derive(Debug, Serialize, Deserialize,Clone)]
 pub struct RevealedCardAndProofDTO {
+    pub masked_card: MaskedCardDTO, // origin card
     pub revealed_card: Vec<u8>,
     pub proof:Vec<u8>,
 }
+
 impl RevealedDeck {
-    pub fn new(deck_and_proofs :Vec<(RevealToken, RevealProof)> )->Result<Self,SerializationError>{
+    pub fn new(deck_and_proofs :Vec<(MaskedCard,RevealToken, RevealProof)> )->Result<Self,SerializationError>{
         let mut cards:Vec<crate::deck::models::deck_case::deck::RevealedCardAndProofDTO> = Vec::with_capacity(deck_and_proofs.len());
         for deck_and_proof in deck_and_proofs {
+            let mut masked_card = Vec::new();
+            encode_masked_card(deck_and_proof.0, &mut masked_card)?;
+
             let mut revealed_card = Vec::new();
-            deck_and_proof.0.serialize_uncompressed(&mut revealed_card)?;
+            deck_and_proof.1.serialize_uncompressed(&mut revealed_card)?;
 
             let mut encoded_proof = Vec::new();
-            encode_masking_proof(deck_and_proof.1,&mut encoded_proof)?;
+            encode_masking_proof(deck_and_proof.2,&mut encoded_proof)?;
 
             cards.push(RevealedCardAndProofDTO {
+                masked_card: MaskedCardDTO{
+                    masked_card: masked_card,
+                },
                 revealed_card: revealed_card,
                 proof:encoded_proof,
             })
@@ -233,5 +255,14 @@ impl RevealedDeck {
         }
         Ok(cards)
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PeekCardsRequest {
+    pub cards: Vec<RevealedCardAndProofDTO>,
+}
+
+#[derive(Debug, Serialize, Deserialize,Clone)]
+pub struct PeekCardsResponse {
 }
 

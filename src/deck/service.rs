@@ -12,7 +12,7 @@ use rand_core::{RngCore, SeedableRng};
 use rocket::data::ToByteUnit;
 use rocket::futures::TryFutureExt;
 use rocket::yansi::Paint;
-use crate::deck::models::deck_case::deck::{SetUpDeckResponse, ComputeAggregateKeyResponse, GenerateDeckRequest, GenerateDeckResponse, InitialDeck, MaskedCardAndProofDTO as CardDTO, ShuffleRequest, ShuffleResponse, VerifyShuffleRequest, VerifyShuffleResponse, ShuffledDeck, RevealCardsRequest, RevealCardsResponse, OpenCardsRequest, OpenCardsResponse, RevealedDeck};
+use crate::deck::models::deck_case::deck::{SetUpDeckResponse, ComputeAggregateKeyResponse, GenerateDeckRequest, GenerateDeckResponse, InitialDeck, MaskedCardAndProofDTO as CardDTO, ShuffleRequest, ShuffleResponse, VerifyShuffleRequest, VerifyShuffleResponse, ShuffledDeck, RevealCardsRequest, RevealCardsResponse, OpenCardsRequest, OpenCardsResponse, RevealedDeck, PeekCardsRequest, PeekCardsResponse, ReceiveAndRevealTokenRequest, ReceiveAndRevealTokenResponse};
 use ark_serialize::{CanonicalSerialize,CanonicalDeserialize};
 use asn1_der::typed::DerEncodable;
 use starknet_curve::{Affine, StarkwareParameters};
@@ -67,7 +67,12 @@ pub trait DeckServiceTrait: Send + Sync {
 
     async fn verify_shuffle(&self, verify_shuffle_request: VerifyShuffleRequest) -> Result<VerifyShuffleResponse, DeckCustomError>;
 
+
+    // user receive their and need to reveal others card at the same time
+    async fn receive_and_reveal_token(&self, receive_and_reveal_token_request: ReceiveAndRevealTokenRequest)->Result<ReceiveAndRevealTokenResponse, DeckCustomError>;
     async fn reveal_cards(&self,reveal_cards_request:  RevealCardsRequest)->Result<RevealCardsResponse, DeckCustomError>;
+
+    async fn peek_cards(&self,peek_cards_request: PeekCardsRequest) -> Result<PeekCardsResponse, DeckCustomError>;
 
     async fn open_cards(&self,open_cards_request: OpenCardsRequest)->Result<OpenCardsResponse, DeckCustomError>;
 }
@@ -313,6 +318,34 @@ impl DeckServiceTrait for DeckService {
         };
         Ok(VerifyShuffleResponse{})
     }
+
+    async fn receive_and_reveal_token(&self, receive_and_reveal_token_request: ReceiveAndRevealTokenRequest)->Result<ReceiveAndRevealTokenResponse, DeckCustomError>{
+        let game_user_id = receive_and_reveal_token_request.game_user_id.clone();
+        let reveal_response = self.reveal_cards(RevealCardsRequest{
+            game_user_id,
+            shuffled_deck: receive_and_reveal_token_request.shuffled_deck,
+        }).await?;
+
+        let mut  user_db = self.user_db.lock().unwrap(); // 守卫生命周期开始
+        let get_user_result = user_db.get(&receive_and_reveal_token_request.game_user_id.clone());
+        let mut user = match get_user_result{
+            Some(game_user) => game_user.clone(),
+            None => return Err(DeckCustomError::UserNotFound),
+        };
+        for card_dto in receive_and_reveal_token_request.received_cards{
+            let masked_card = match decode_masked_card(card_dto.masked_card){
+                Ok(p) => p,
+                Err(_e)=> return Err(DeckCustomError::InvalidProof)
+            };
+            user.cards.push(masked_card);
+        }
+        user_db.insert(receive_and_reveal_token_request.game_user_id.clone(),user);
+        Ok(ReceiveAndRevealTokenResponse{
+            revealed_deck:reveal_response.revealed_deck,
+        })
+    }
+
+
     async fn reveal_cards(&self,reveal_cards_request:  RevealCardsRequest)->Result<RevealCardsResponse, DeckCustomError>{
         let shuffled_deck= match reveal_cards_request.shuffled_deck.into_masked_card(){
             Ok(p) => p,
@@ -340,7 +373,7 @@ impl DeckServiceTrait for DeckService {
                 Ok(p) => p,
                 Err(_e)=> return Err(DeckCustomError::GenericError(String::from("Internal")))
             };
-            reveal_cards.push(reveal_card);
+            reveal_cards.push((masked_card,reveal_card.0,reveal_card.1));
         }
         let deck =match  RevealedDeck::new(reveal_cards){
             Ok(p) => p,
@@ -351,8 +384,25 @@ impl DeckServiceTrait for DeckService {
         })
     }
 
+
+    async fn peek_cards(&self,peek_cards_request: PeekCardsRequest) -> Result<PeekCardsResponse, DeckCustomError>{
+        todo!()
+    }
+
+
     async fn open_cards(&self,open_cards_request: OpenCardsRequest)->Result<OpenCardsResponse, DeckCustomError>{
         todo!()
+        // let rng = &mut thread_rng();
+        // let parameters = match CardProtocol::setup(rng, 2, 26){
+        //     Ok(p) => p,
+        //     Err(_e)=> return Err(DeckCustomError::GenericError(String::from("Internal")))
+        // };
+        //
+        // let unmasked_card = CardProtocol::unmask(&parameters, reveal_tokens, card)?;
+        // let opened_card = card_mappings.get(&unmasked_card);
+        // let opened_card = opened_card.ok_or(GameErrors::InvalidCard)?;
+        //
+        // Ok(*opened_card)
     }
 }
 
@@ -382,6 +432,29 @@ fn encode_cards<R: Rng>(rng: &mut R, num_of_cards: usize) -> HashMap<Card, Class
 
     map
 }
+
+// pub fn peek_at_card(
+//     &mut self,
+//     parameters: &CardParameters,
+//     reveal_tokens: &mut Vec<(RevealToken, RevealProof, PublicKey)>,
+//     card_mappings: &HashMap<Card, ClassicPlayingCard>,
+//     card: &MaskedCard,
+// ) -> Result<(), anyhow::Error> {
+//     let i = self.cards.iter().position(|&x| x == *card);
+//
+//     let i = i.ok_or(GameErrors::CardNotFound)?;
+//
+//     //TODO add function to create that without the proof
+//     let rng = &mut thread_rng();
+//     let own_reveal_token = self.compute_reveal_token(rng, parameters, card)?;
+//     reveal_tokens.push(own_reveal_token);
+//
+//     let unmasked_card = CardProtocol::unmask(&parameters, reveal_tokens, card)?;
+//     let opened_card = card_mappings.get(&unmasked_card);
+//     let opened_card = opened_card.ok_or(GameErrors::InvalidCard)?;
+//     self.opened_cards[i] = Some(*opened_card);
+//     Ok(())
+// }
 
 #[cfg(test)]
 mod unit_tests {
