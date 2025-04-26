@@ -68,6 +68,7 @@ async fn rocket() -> _ {
         .mount("/", routes![user::routes::create])
         .mount("/", routes![user::routes::delete])
         .manage(deck_service)
-        .mount("/",routes![deck::routes::setup])
         .mount("/",routes![deck::routes::initialize])
+        .mount("/",routes![deck::routes::setup])
+        .mount("/",routes![deck::routes::compute_aggregate_key])
 }

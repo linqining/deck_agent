@@ -63,7 +63,6 @@ pub struct SetUpDeckResponse{
 pub struct Player{
     pub game_id:String,
     pub game_user_id:String,
-    name: Vec<u8>,
     pub public_key: Vec<u8>,
     pub proof: Vec<u8>,
 }
