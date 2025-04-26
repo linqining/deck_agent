@@ -16,7 +16,7 @@ use crate::deck::models::deck_case::deck::{SetUpDeckResponse, ComputeAggregateKe
 use ark_serialize::{CanonicalSerialize,CanonicalDeserialize};
 use asn1_der::typed::DerEncodable;
 use starknet_curve::{Affine, StarkwareParameters};
-use crate::serialize::serialize::{encode_public_key, decode_public_key, encode_proof, decode_proof, decode_masked_card, encode_masked_card, encode_masking_proof, decode_shuffle_proof, encode_shuffle_proof};
+use crate::serialize::serialize::{encode_public_key, decode_public_key, encode_proof, decode_proof, decode_masked_card, encode_masked_card, encode_masking_proof, decode_shuffle_proof, encode_shuffle_proof, encode_initial_card};
 
 use proof_essentials::homomorphic_encryption::{
     el_gamal, el_gamal::ElGamal, HomomorphicEncryptionScheme,
@@ -85,7 +85,6 @@ impl DeckServiceTrait for DeckService {
     async fn initial_deck(&self,initial_deck: InitialDeckRequest)->Result<InitialDeckResponse, DeckCustomError>{
         // Each player should run this computation and verify that all players agree on the initial deck
         let rng = &mut thread_rng();
-
         let card_mapping = encode_cards(rng, 2*26);
         let mut reveal_cards  =  Vec::with_capacity(card_mapping.len());
         for card in card_mapping {
@@ -93,9 +92,13 @@ impl DeckServiceTrait for DeckService {
             if let Err(e) = card.0.serialize_uncompressed(&mut encoded_card){
                 return Err(DeckCustomError::GenericError(String::from("Internal")))
             };
+            let card_hex = match encode_initial_card(card.0){
+                Ok(c) => c,
+                Err(e) => return Err(DeckCustomError::GenericError(String::from("Internal")))
+            };
             reveal_cards.push(InitialCard{
                 classic_card: card.1,
-                card: encoded_card,
+                card: card_hex,
             });
         }
         Ok(

@@ -31,7 +31,7 @@ pub struct InitialDeckRequest {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InitialCard{
     pub classic_card: ClassicPlayingCard,
-    pub card: Vec<u8>,
+    pub card: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

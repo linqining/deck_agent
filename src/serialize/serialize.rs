@@ -138,3 +138,18 @@ pub fn decode_revel_proof(proof_hex :String)->Result<RevealProof, SerializationE
     let restored_result = RevealProof::deserialize(bytes.reader());
     restored_result
 }
+
+pub fn encode_initial_card(card :Card)->Result<String, SerializationError>{
+    let mut bytes = Vec::new();
+    card.serialize_uncompressed(&mut bytes)?;
+    Ok(hex::encode(&bytes))
+}
+
+pub fn decode_initial_card(card_hex :String)->Result<Card, SerializationError>{
+    let bytes = match Vec::from_hex(card_hex){
+        Ok(bytes) => bytes,
+        Err(err)    => return Err(ark_serialize::SerializationError::InvalidData)
+    };
+    let restored_result = Card::deserialize(bytes.reader());
+    restored_result
+}
