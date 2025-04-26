@@ -152,14 +152,11 @@ impl DeckServiceTrait for DeckService {
         let game_user = GameUser::new(set_up.game_user_id.clone(),set_up.user_id.clone(),pk,sk);
 
         //TODO 用户对局信息存起来
+        let pub_key = match encode_public_key(pk){
+            Ok(p) => p,
+            Err(_e)=> return Err(DeckCustomError::GenericError(String::from("Failed to serialize pk")))
+        };
 
-
-        let mut encoded_pk = Vec::new();
-        if let Err(_e) = encode_public_key(pk,&mut encoded_pk){
-            return Err(DeckCustomError::GenericError(String::from("Failed to serialize pk")))
-        }
-        // let restored_pk:GroupAffine<StarkwareParameters> = decode_public_key(encoded_pk).unwrap();
-        // println!("{:?}", restored_pk);
         let  game_user_info = set_up.game_user_id.clone().into_bytes();
 
         let proof =match CardProtocol::prove_key_ownership( rng, &params, &pk, &sk, &game_user_info){
@@ -168,10 +165,10 @@ impl DeckServiceTrait for DeckService {
         };
         println!("proof {:?}", proof);
 
-        let mut encoded_proof = Vec::new();
-        if let Err(_e) = encode_proof(proof,&mut encoded_proof){
-            return Err(DeckCustomError::GenericError(String::from("Failed to serialize pk")))
-        }
+        let proof_hex = match encode_proof(proof){
+            Ok(p) => p,
+            Err(_e)=> return Err(DeckCustomError::GenericError(String::from("Failed to serialize proof")))
+        };
         //
         // let restored_proof= decode_proof(&encoded_proof).unwrap();
         // println!("restored_proof {:?}", restored_proof);
@@ -187,8 +184,8 @@ impl DeckServiceTrait for DeckService {
             user_id:set_up.user_id,
             game_id:set_up.game_id,
             game_user_id: set_up.game_user_id,
-            user_public_key:  encoded_pk,
-            user_key_proof: encoded_proof,
+            user_public_key:  pub_key,
+            user_key_proof: proof_hex,
         })
     }
     async fn compute_aggregate_key(&self,compute_agg_key_request: ComputeAggregateKeyRequest)->Result<ComputeAggregateKeyResponse,DeckCustomError> {
@@ -205,7 +202,7 @@ impl DeckServiceTrait for DeckService {
                 Err(_e) => return Err(DeckCustomError::InvalidPublicKey)
             };
 
-            let key_proof = match decode_proof(&player.proof) {
+            let key_proof = match decode_proof(player.proof) {
                 Ok(p) => p,
                 Err(_e) => return Err(DeckCustomError::InvalidProof)
             };
@@ -217,12 +214,12 @@ impl DeckServiceTrait for DeckService {
             Err(_e)=> return Err(DeckCustomError::InvalidProof)
         };
 
-        let mut encoded_pk = Vec::new();
-        if let Err(_e) = encode_public_key(joint_pk,&mut encoded_pk){
-            return Err(DeckCustomError::GenericError(String::from("Failed to serialize pk")))
-        }
+        let public_key = match encode_public_key(joint_pk){
+            Ok(p) => p,
+            Err(_e)=> return Err(DeckCustomError::GenericError(String::from("Failed to serialize pk")))
+        };
         Ok(ComputeAggregateKeyResponse{
-            joined_key:encoded_pk,
+            joined_key:public_key,
         })
     }
 
@@ -292,15 +289,12 @@ impl DeckServiceTrait for DeckService {
             Ok(p) => p,
             Err(_e)=> return Err(DeckCustomError::InvalidProof)
         };
-        let mut encoded_proof = Vec::new();
-        if let Err(e)= a_shuffle_proof.serialize_uncompressed(&mut encoded_proof){
-            return Err(DeckCustomError::SerializationError(e.to_string()))
+
+
+        let proof_hex = match encode_shuffle_proof(&a_shuffle_proof){
+            Ok(p) => p,
+            Err(_e)=> return Err(DeckCustomError::InvalidProof)
         };
-
-
-        if let Err(er)= encode_shuffle_proof(&a_shuffle_proof,&mut encoded_proof){
-            return Err(DeckCustomError::SerializationError(String::from("Failed to shuffle proof")))
-        }
 
         let shuffle_deck_dto = match ShuffledDeck::new(a_shuffled_deck){
             Ok(p) => p,
@@ -309,7 +303,7 @@ impl DeckServiceTrait for DeckService {
 
         Ok(ShuffleResponse{
             deck: shuffle_deck_dto,
-            shuffle_proof:encoded_proof,
+            shuffle_proof:proof_hex,
         })
     }
 
