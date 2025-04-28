@@ -2,8 +2,13 @@ use std::ffi::c_void;
 use std::io::{Read, Write};
 use ark_ec::short_weierstrass_jacobian::GroupAffine;
 use ark_serialize::{CanonicalSerialize,CanonicalDeserialize, SWFlags, SerializationError};
+use barnett_smart_card_protocol::BarnettSmartProtocol;
+use barnett_smart_card_protocol::discrete_log_cards::DLCards;
+use proof_essentials::homomorphic_encryption::el_gamal;
+use proof_essentials::vector_commitment::pedersen;
 use proof_essentials::zkp::proofs::{chaum_pedersen_dl_equality, schnorr_identification};
 use serde::{Serialize, Deserialize};
+use starknet_curve::StarkwareParameters;
 use crate::card::classic_card::ClassicPlayingCard;
 
 type Curve = starknet_curve::Projective;
@@ -21,12 +26,42 @@ type MaskedCard = barnett_smart_card_protocol::discrete_log_cards::MaskedCard<Cu
 type RevealToken = barnett_smart_card_protocol::discrete_log_cards::RevealToken<Curve>;
 type Card = barnett_smart_card_protocol::discrete_log_cards::Card<Curve>;
 
+type Parameters = <DLCards<ark_ec::short_weierstrass_jacobian::GroupProjective<StarkwareParameters>> as BarnettSmartProtocol>::Parameters;
+
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InitialDeckRequest {
     // pub m:usize,
     // pub n:usize,
 }
+
+// #[derive(Debug, Serialize, Deserialize)]
+// pub struct InitParams{
+//     pub m: u32,
+//     pub n: u32,
+//     pub enc_parameters: String,
+//     pub commit_parameters: String,
+//     pub generator: String,
+// }
+//
+// impl InitParams {
+//     pub fn new(params :Parameters )->Result<Self,SerializationError>{
+//         let mut cards:Vec<crate::deck::models::deck_case::deck::MaskedCardAndProofDTO> = Vec::with_capacity(deck_and_proofs.len());
+//         for deck_and_proof in deck_and_proofs {
+//             let card_hex = encode_masked_card(deck_and_proof.0)?;
+//             let proof_hex = encode_masking_proof(deck_and_proof.1)?;
+//             cards.push(crate::deck::models::deck_case::deck::MaskedCardAndProofDTO {
+//                 masked_card: card_hex,
+//                 proof:proof_hex,
+//             })
+//         }
+//
+//         Ok(InitialDeck {
+//             cards:cards,
+//         })
+//     }
+// }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InitialCard{
@@ -37,6 +72,7 @@ pub struct InitialCard{
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InitialDeckResponse {
     pub cards: Vec<InitialCard>,
+    pub seed_hex: String,
 }
 
 
@@ -46,8 +82,14 @@ pub struct SetUpDeckRequest{
     pub user_id: String, // user_id provide by the agent service
     pub game_id: String,
     pub game_user_id: String, // user identity among this round
+    pub seed_hex: String,
     // pub m:usize,
     // pub n:usize,
+}
+#[derive(Debug,Clone, Serialize, Deserialize)]
+pub struct Proof{
+    pub commit: String,
+    pub opening: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -56,7 +98,7 @@ pub struct SetUpDeckResponse{
     pub game_id:String,
     pub game_user_id:String,
     pub user_public_key:String,
-    pub user_key_proof:String,
+    pub user_key_proof:Proof,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -64,12 +106,13 @@ pub struct Player{
     pub game_id:String,
     pub game_user_id:String,
     pub public_key: String,
-    pub proof: String,
+    pub user_key_proof: Proof,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ComputeAggregateKeyRequest {
-    pub players: Vec<Player>
+    pub players: Vec<Player>,
+    pub seed_hex: String,
 }
 
 

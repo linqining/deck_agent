@@ -10,6 +10,7 @@ pub enum DeckCustomError {
     MissingFields(String),
     GenericError(String),
     SerializationError(String),
+    InvalidSeed,
 }
 
 impl fmt::Display for DeckCustomError {
@@ -21,6 +22,7 @@ impl fmt::Display for DeckCustomError {
             DeckCustomError::InvalidPublicKey => write!(f, "invalid public key"),
             DeckCustomError::SerializationError(msg) => write!(f, "Serialization err: {}", msg),
             DeckCustomError::UserNotFound => write!(f, "User not found"),
+            DeckCustomError::InvalidSeed => write!(f, "invalid seed"),
         }
     }
 }

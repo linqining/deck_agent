@@ -369,7 +369,7 @@ dependencies = [
 [[package]]
 name = "barnett-smart-card-protocol"
 version = "0.1.0"
-source = "git+https://github.com/geometryxyz/mental-poker.git#b1313f375650e5e67a7312a6632421404fa07b73"
+source = "git+https://github.com/linqining/mental-poker-rust.git?branch=develop#4535b9f2ca0116e37dc2cd6ea748a710b124bd1e"
 dependencies = [
  "anyhow",
  "ark-crypto-primitives",
@@ -859,6 +859,7 @@ dependencies = [
  "blake2",
  "dotenv",
  "hex",
+ "log",
  "merlin",
  "mockall",
  "mongodb",
@@ -1946,7 +1947,7 @@ dependencies = [
 [[package]]
 name = "proof-essentials"
 version = "0.1.0"
-source = "git+ssh://git@github.com/geometryresearch/proof-toolbox.git#ada587360d8630942f474c53000cb24212c6a300"
+source = "git+https://github.com/linqining/proof-toolbox.git?branch=develop#1eec7c7e3335161cd4f0a78a5765157c456b749a"
 dependencies = [
  "ark-crypto-primitives",
  "ark-ec",
@@ -2580,7 +2581,7 @@ checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 [[package]]
 name = "starknet-curve"
 version = "0.1.0"
-source = "git+ssh://git@github.com/geometryresearch/proof-toolbox.git#ada587360d8630942f474c53000cb24212c6a300"
+source = "git+https://github.com/linqining/proof-toolbox.git?branch=develop#1eec7c7e3335161cd4f0a78a5765157c456b749a"
 dependencies = [
  "ark-ec",
  "ark-ff",

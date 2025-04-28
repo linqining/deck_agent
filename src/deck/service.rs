@@ -1,5 +1,5 @@
 use ark_ec::group::Group;
-use ark_ec::ProjectiveCurve;
+use ark_ec::{AffineCurve, ProjectiveCurve};
 use ark_ec::short_weierstrass_jacobian::GroupAffine;
 use barnett_smart_card_protocol::BarnettSmartProtocol;
 use barnett_smart_card_protocol::discrete_log_cards::{ DLCards, Parameters};
@@ -8,15 +8,15 @@ use super::{models::{ deck_case::deck::{
     SetUpDeckRequest,
     ComputeAggregateKeyRequest}}, errors::DeckCustomError, repository::UserDbTrait};
 use rand_chacha::{ChaCha20Rng};
-use rand_core::{RngCore, SeedableRng};
+use rand_core::{CryptoRngCore, RngCore, SeedableRng};
 use rocket::data::ToByteUnit;
 use rocket::futures::TryFutureExt;
 use rocket::yansi::Paint;
-use crate::deck::models::deck_case::deck::{SetUpDeckResponse, ComputeAggregateKeyResponse, GenerateDeckRequest, GenerateDeckResponse, InitialDeck, MaskedCardAndProofDTO as CardDTO, ShuffleRequest, ShuffleResponse, VerifyShuffleRequest, VerifyShuffleResponse, ShuffledDeck, RevealCardsRequest, RevealCardsResponse, OpenCardsRequest, OpenCardsResponse, RevealedDeck, PeekCardsRequest, PeekCardsResponse, ReceiveAndRevealTokenRequest, ReceiveAndRevealTokenResponse, InitialDeckRequest, InitialDeckResponse, InitialCard};
+use crate::deck::models::deck_case::deck::{SetUpDeckResponse, ComputeAggregateKeyResponse, GenerateDeckRequest, GenerateDeckResponse, InitialDeck, MaskedCardAndProofDTO as CardDTO, ShuffleRequest, ShuffleResponse, VerifyShuffleRequest, VerifyShuffleResponse, ShuffledDeck, RevealCardsRequest, RevealCardsResponse, OpenCardsRequest, OpenCardsResponse, RevealedDeck, PeekCardsRequest, PeekCardsResponse, ReceiveAndRevealTokenRequest, ReceiveAndRevealTokenResponse, InitialDeckRequest, InitialDeckResponse, InitialCard, Proof};
 use ark_serialize::{CanonicalSerialize,CanonicalDeserialize};
 use asn1_der::typed::DerEncodable;
 use starknet_curve::{Affine, StarkwareParameters};
-use crate::serialize::serialize::{encode_public_key, decode_public_key, encode_proof, decode_proof, decode_masked_card, encode_masked_card, encode_masking_proof, decode_shuffle_proof, encode_shuffle_proof, encode_initial_card};
+use crate::serialize::serialize::{encode_public_key, decode_public_key, decode_masked_card, encode_masked_card, encode_masking_proof, decode_shuffle_proof, encode_shuffle_proof, encode_initial_card};
 
 use proof_essentials::homomorphic_encryption::{
     el_gamal, el_gamal::ElGamal, HomomorphicEncryptionScheme,
@@ -43,6 +43,8 @@ type RevealProof = chaum_pedersen_dl_equality::proof::Proof<Curve>;
 use proof_essentials::utils::permutation::Permutation;
 use proof_essentials::utils::rand::sample_vector;
 use crate::game_user::repository::GameUserMemTrait;
+use hex::FromHex;
+type ZKProof = schnorr_identification::proof::Proof<Curve>;
 
 pub struct DeckService {
     user_db: Mutex<HashMap<String, GameUser>>,
@@ -84,8 +86,11 @@ pub trait DeckServiceTrait: Send + Sync {
 impl DeckServiceTrait for DeckService {
     async fn initial_deck(&self,initial_deck: InitialDeckRequest)->Result<InitialDeckResponse, DeckCustomError>{
         // Each player should run this computation and verify that all players agree on the initial deck
-        let rng = &mut thread_rng();
-        let card_mapping = encode_cards(rng, 2*26);
+        let  mut rng = ChaCha20Rng::from_entropy();
+        let seed = rng.clone().get_seed();
+        let seed_hex = hex::encode(&seed);
+        let mut rng = thread_rng();
+        let card_mapping = encode_cards(&mut rng, 2*26);
         let mut reveal_cards  =  Vec::with_capacity(card_mapping.len());
         for card in card_mapping {
             let mut encoded_card = Vec::new();
@@ -104,6 +109,7 @@ impl DeckServiceTrait for DeckService {
         Ok(
             InitialDeckResponse{
                 cards: reveal_cards,
+                seed_hex: seed_hex,
             }
         )
     }
@@ -127,27 +133,21 @@ impl DeckServiceTrait for DeckService {
                 missing_properties.join(", ").to_string(),
             ));
         }
-
-        // let  rng = ChaCha20Rng::from_entropy();
-        // let seed = rng.get_seed();
-        // print!("seed{:?}",seed);
-        //
-        //
-        // let serialized = bincode::serialize(&set_up.rng_seed).unwrap();
-        // let deserialized: <ChaCha20Rng as SeedableRng>::Seed =
-        //     match bincode::deserialize(&serialized) {
-        //         Ok(v) => v,
-        //         Err(_e)=> return Err(DeckCustomError::InvalidSeed)
-        //     };
-        // let mut restored_rng = ChaCha20Rng::from_seed(deserialized);
-
-        let rng = &mut thread_rng();
-
-        let params= match   CardProtocol::setup(rng, 2, 26){
+        let mut seed = match Vec::from_hex(set_up.seed_hex){
+            Ok(seed) => seed,
+            Err(e) => return Err(DeckCustomError::InvalidSeed)
+        };
+        if seed.len()!=32{
+            return Err(DeckCustomError::InvalidSeed)
+        }
+        let array_data: [u8; 32] = seed.try_into()
+            .expect("Vec<u8> 的长度必须为 32");
+        let mut restored_rng = ChaCha20Rng::from_seed(array_data);
+        let params= match   CardProtocol::setup(&mut restored_rng, 2, 26){
             Ok(p) => p,
             Err(_e)=> return Err(DeckCustomError::InvalidProof)
         };
-
+        let rng = &mut thread_rng();
         let (pk, sk) = match CardProtocol::player_keygen(rng, &params){
             Ok(tuple) =>  tuple,
             Err(_e)=> return Err(DeckCustomError::InvalidPublicKey)
@@ -159,41 +159,37 @@ impl DeckServiceTrait for DeckService {
             Ok(p) => p,
             Err(_e)=> return Err(DeckCustomError::GenericError(String::from("Failed to serialize pk")))
         };
-
         let  game_user_info = set_up.game_user_id.clone().into_bytes();
 
-        let proof =match CardProtocol::prove_key_ownership( rng, &params, &pk, &sk, &game_user_info){
+        let proof =match CardProtocol::prove_key_ownership(rng, &params, &pk, &sk, &game_user_info){
             Ok(p) => p,
             Err(_e)=> return Err(DeckCustomError::InvalidProof)
         };
-        println!("proof {:?}", proof);
-
-        let proof_hex = match encode_proof(proof){
-            Ok(p) => p,
-            Err(_e)=> return Err(DeckCustomError::GenericError(String::from("Failed to serialize proof")))
-        };
-        //
-        // let restored_proof= decode_proof(&encoded_proof).unwrap();
-        // println!("restored_proof {:?}", restored_proof);
-        //
-        // println!("isequal {:?}", restored_proof.eq(&proof));
-
-        // if let Err(e)= self.user_db.create(set_up.game_user_id.clone().to_string(),User::new(){
-        //     return Err(DeckCustomError::GenericError())
-        // })
+        let proof_third = ProofThird::new(proof);
         self.user_db.lock().unwrap().insert(set_up.game_user_id.clone(), game_user);
-
         Ok(SetUpDeckResponse{
             user_id:set_up.user_id,
             game_id:set_up.game_id,
             game_user_id: set_up.game_user_id,
             user_public_key:  pub_key,
-            user_key_proof: proof_hex,
+            user_key_proof: Proof{
+                commit: proof_third.commit,
+                opening:proof_third.opening,
+            },
         })
     }
     async fn compute_aggregate_key(&self,compute_agg_key_request: ComputeAggregateKeyRequest)->Result<ComputeAggregateKeyResponse,DeckCustomError> {
-        let rng = &mut thread_rng();
-        let parameters = match CardProtocol::setup(rng, 2, 26){
+        let mut seed = match Vec::from_hex(compute_agg_key_request.seed_hex){
+            Ok(seed) => seed,
+            Err(e) => return Err(DeckCustomError::InvalidSeed)
+        };
+        if seed.len()!=32{
+            return Err(DeckCustomError::InvalidSeed)
+        }
+        let array_data: [u8; 32] = seed.try_into()
+            .expect("Vec<u8> 的长度必须为 32");
+        let mut restored_rng = ChaCha20Rng::from_seed(array_data);
+        let parameters = match CardProtocol::setup(&mut restored_rng, 2, 26){
             Ok(p) => p,
             Err(_e)=> return Err(DeckCustomError::GenericError(String::from("Internal")))
         };
@@ -205,13 +201,18 @@ impl DeckServiceTrait for DeckService {
                 Err(_e) => return Err(DeckCustomError::InvalidPublicKey)
             };
 
-            let key_proof = match decode_proof(player.proof) {
-                Ok(p) => p,
-                Err(_e) => return Err(DeckCustomError::InvalidProof)
-            };
+
+            let key_proof=ProofThird{
+                commit:player.user_key_proof.commit.clone(),
+                opening:player.user_key_proof.opening.clone(),
+            }.to_curve()?;
+
+            // 验证对方公钥
+            if  let Err(e) = CardProtocol::verify_key_ownership(&parameters,&public_key,&player.game_user_id.clone().into_bytes(),&key_proof){
+                return Err(DeckCustomError::InvalidProof)
+            }
             key_proof_info.push((public_key, key_proof, player.game_user_id.clone().into_bytes()))
         }
-
         let joint_pk = match CardProtocol::compute_aggregate_key(&parameters, &key_proof_info){
             Ok(p) => p,
             Err(_e)=> return Err(DeckCustomError::InvalidProof)
@@ -431,10 +432,12 @@ impl DeckServiceTrait for DeckService {
 
 use crate::card::classic_card::{Suite,ClassicPlayingCard,Value};
 use ark_ff::{to_bytes, UniformRand};
+use asn1_der::e;
 use proof_essentials::vector_commitment::pedersen::PedersenCommitment;
 use proof_essentials::zkp::arguments::shuffle;
 use proof_essentials::zkp::proofs::{chaum_pedersen_dl_equality, schnorr_identification};
 use crate::game_user::models::game_user::GameUser;
+use crate::serialize::proof::{ProofThird};
 use crate::user::errors::CustomError;
 use crate::user::models::user::User;
 
