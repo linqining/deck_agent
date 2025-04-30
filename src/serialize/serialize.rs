@@ -149,7 +149,7 @@ pub fn decode_revel_proof(proof_hex :String)->Result<RevealProof, SerializationE
 
 pub fn encode_initial_card(card :Card)->Result<String, SerializationError>{
     let mut bytes = Vec::new();
-    card.serialize_uncompressed(&mut bytes)?;
+    card.serialize(&mut bytes)?;
     Ok(hex::encode(&bytes))
 }
 
