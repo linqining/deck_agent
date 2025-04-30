@@ -6,6 +6,7 @@ use std::error::Error;
 pub enum DeckCustomError {
     InvalidProof,
     InvalidPublicKey,
+    InvalidCard,
     UserNotFound,
     MissingFields(String),
     GenericError(String),
@@ -23,6 +24,7 @@ impl fmt::Display for DeckCustomError {
             DeckCustomError::SerializationError(msg) => write!(f, "Serialization err: {}", msg),
             DeckCustomError::UserNotFound => write!(f, "User not found"),
             DeckCustomError::InvalidSeed => write!(f, "invalid seed"),
+            DeckCustomError::InvalidCard => write!(f, "invalid card"),
         }
     }
 }

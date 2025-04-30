@@ -71,4 +71,5 @@ async fn rocket() -> _ {
         .mount("/",routes![deck::routes::initialize])
         .mount("/",routes![deck::routes::setup])
         .mount("/",routes![deck::routes::compute_aggregate_key])
+        .mount("/",routes![deck::routes::mask])
 }

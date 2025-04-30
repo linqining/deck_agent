@@ -2,12 +2,11 @@ use rocket::response::status;
 use rocket::{ State, http::Status};
 use rocket::serde::json::Json;
 
-use crate::deck::models::deck_case::deck::{ComputeAggregateKeyRequest, ComputeAggregateKeyResponse, InitialDeckRequest, InitialDeckResponse, SetUpDeckRequest, SetUpDeckResponse};
+use crate::deck::models::deck_case::deck::{ComputeAggregateKeyRequest, ComputeAggregateKeyResponse, InitialDeckRequest, InitialDeckResponse, MaskRequest, MaskResponse, SetUpDeckRequest, SetUpDeckResponse};
 use crate::user::service::UserServiceTrait;
 use crate::core::api_response::ErrorResponse;
 use crate::deck::errors::DeckCustomError;
-use crate::deck::service::{DeckService, DeckServiceTrait};
-use crate::user::errors::CustomError;
+use crate::deck::service::{ DeckServiceTrait};
 
 
 
@@ -79,6 +78,31 @@ pub async fn compute_aggregate_key(deck_service: &State<Box<dyn DeckServiceTrait
 
     Ok(status::Custom(Status::Created, Json(ComputeAggregateKeyResponse {
         ..setup_response
+    })))
+}
+
+
+#[post("/deck/mask", data = "<mask_req>")]
+pub async fn mask(deck_service: &State<Box<dyn DeckServiceTrait>>,mask_req: Json<MaskRequest> ) -> Result<status::Custom<Json<MaskResponse>>, status::Custom<Json<ErrorResponse>>> {
+    let mask_request = MaskRequest {
+        ..mask_req.into_inner()
+    };
+    let mask_response = deck_service.mask(mask_request).await;
+    let mask_response = match mask_response {
+        Ok(response) => response,
+        Err(err) => {
+            match err {
+                DeckCustomError::GenericError(msg) => return Err(status::Custom(Status::InternalServerError, Json(ErrorResponse { message: msg }))),
+                DeckCustomError::MissingFields(msg) => return Err(status::Custom(Status::BadRequest, Json(ErrorResponse { message: format!("The following properties are required: {}", msg) }))),
+                DeckCustomError::InvalidPublicKey => return Err(status::Custom(Status::BadRequest,Json(ErrorResponse{message: format!("invalid public key")}))),
+                DeckCustomError::InvalidProof=>return Err(status::Custom(Status::BadRequest,Json(ErrorResponse{message: format!("invalid proof")}))),
+                _ => return Err(status::Custom(Status::InternalServerError, Json(ErrorResponse { message: err.to_string() }))),
+            }
+        }
+    };
+
+    Ok(status::Custom(Status::Created, Json(MaskResponse {
+        ..mask_response
     })))
 }
 

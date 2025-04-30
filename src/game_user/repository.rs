@@ -12,7 +12,7 @@ use mockall::automock;
 //     async fn create(&self, user: User) -> Result<String, CustomError>;
 //     async fn delete(&self, id: &str) -> Result<(), CustomError>;
 // }
-#[cfg_attr(test,  )]
+#[cfg_attr(test, automock )]
 pub trait GameUserMemTrait: Sync + Send {
      fn get_by_id(&self, id: &str) -> Result<& GameUser, CustomError>;
      fn create(&mut self, game_user: GameUser) -> Result<String, CustomError>;

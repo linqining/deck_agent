@@ -20,6 +20,7 @@ type RemaskingProof = chaum_pedersen_dl_equality::proof::Proof<Curve>;
 type RevealProof = chaum_pedersen_dl_equality::proof::Proof<Curve>;
 use crate::deck::errors::DeckCustomError;
 use crate::game_user::models::game_user::GameUser;
+use crate::serialize::proof::{IdentityProof, PedersenProof};
 use crate::serialize::serialize::{decode_masked_card, decode_masking_proof, decode_revel_proof, decode_revel_token, encode_masked_card, encode_masking_proof, encode_revel_token};
 
 type MaskedCard = barnett_smart_card_protocol::discrete_log_cards::MaskedCard<Curve>;
@@ -92,6 +93,13 @@ pub struct Proof{
     pub opening: String,
 }
 
+#[derive(Debug,Clone, Serialize, Deserialize)]
+pub struct PedersenProofDTO{
+    pub a: String,
+    pub b: String,
+    pub r: String,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SetUpDeckResponse{
     pub user_id:String,
@@ -127,22 +135,22 @@ pub struct GenerateDeckRequest{
 }
 
 #[derive(Debug, Serialize, Deserialize,Clone)]
-pub struct MaskedCardAndProofDTO {
+pub struct InitCardAndProofDTO {
     pub masked_card: String,
     pub proof: String,
 }
 #[derive(Debug, Serialize, Deserialize,Clone)]
 pub struct InitialDeck {
-    pub cards: Vec<MaskedCardAndProofDTO>,
+    pub cards: Vec<InitCardAndProofDTO>,
 }
 
 impl InitialDeck {
     pub fn new(deck_and_proofs :Vec<(MaskedCard, RemaskingProof)> )->Result<Self,SerializationError>{
-        let mut cards:Vec<crate::deck::models::deck_case::deck::MaskedCardAndProofDTO> = Vec::with_capacity(deck_and_proofs.len());
+        let mut cards:Vec<InitCardAndProofDTO> = Vec::with_capacity(deck_and_proofs.len());
         for deck_and_proof in deck_and_proofs {
             let card_hex = encode_masked_card(deck_and_proof.0)?;
             let proof_hex = encode_masking_proof(deck_and_proof.1)?;
-            cards.push(crate::deck::models::deck_case::deck::MaskedCardAndProofDTO {
+            cards.push(InitCardAndProofDTO {
                 masked_card: card_hex,
                 proof:proof_hex,
             })
@@ -152,12 +160,12 @@ impl InitialDeck {
             cards:cards,
         })
     }
-    pub fn into_masked_card(&self)-> Result<Vec<(MaskedCard, RemaskingProof)>,ark_serialize::SerializationError>{
+    pub fn into_masked_card(&self)-> Result<Vec<(MaskedCard, RemaskingProof)>,DeckCustomError>{
         let card_length = self.cards.len();
         let mut cards =Vec::with_capacity(card_length);
         for card in self.cards.clone().into_iter(){
             let masked_card = decode_masked_card(card.masked_card)?;
-            let proof = decode_masking_proof(card.proof)?;
+            let proof = decode_masking_proof(card.proof).unwrap();
             cards.push((masked_card, proof));
         }
         Ok(cards)
@@ -188,7 +196,7 @@ impl ShuffledDeck {
         })
     }
 
-    pub fn into_masked_card(&self)-> Result<Vec<MaskedCard>,ark_serialize::SerializationError>{
+    pub fn into_masked_card(&self)-> Result<Vec<MaskedCard>,DeckCustomError>{
         let card_length = self.cards.len();
         let mut cards =Vec::with_capacity(card_length);
         for card in self.cards.clone().into_iter(){
@@ -322,5 +330,72 @@ pub struct PeekCardsRequest {
 
 #[derive(Debug, Serialize, Deserialize,Clone)]
 pub struct PeekCardsResponse {
+}
+
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MaskRequest{
+    pub seed_hex: String,
+    pub joined_key: String,
+    pub cards: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize,Clone)]
+pub struct MaskedCardAndProofDTO {
+    pub masked_card: String,
+    pub proof:PedersenProofDTO,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MaskResponse{
+    pub cards: Vec<MaskedCardAndProofDTO>,
+}
+
+
+#[derive(Debug, Serialize, Deserialize,Clone)]
+pub struct MaskDeck {
+    pub cards: Vec<MaskedCardAndProofDTO>,
+}
+
+impl MaskDeck {
+    pub fn new(deck_and_proofs :Vec<(MaskedCard, RemaskingProof)> )->Result<Self,SerializationError>{
+        let mut cards:Vec<MaskedCardAndProofDTO> = Vec::with_capacity(deck_and_proofs.len());
+        for deck_and_proof in deck_and_proofs {
+            let card_hex = encode_masked_card(deck_and_proof.0)?;
+            // println!("cardHex:{:?}",card_hex);
+            // println!("origin card {:?}",deck_and_proof.0);
+            let proof = PedersenProof::new(deck_and_proof.1);
+            cards.push(MaskedCardAndProofDTO {
+                masked_card: card_hex,
+                proof: PedersenProofDTO{
+                    a:proof.a,
+                    b:proof.b,
+                    r:proof.r,
+                },
+            })
+        }
+        Ok(MaskDeck {
+            cards:cards,
+        })
+    }
+    pub fn into_masked_card(&self)-> Result<Vec<(MaskedCard, RemaskingProof)>,DeckCustomError>{
+        let card_length = self.cards.len();
+        let mut cards =Vec::with_capacity(card_length);
+        for card in self.cards.clone().into_iter(){
+            let masked_card = decode_masked_card(card.masked_card.clone())?;
+            // println!("decode card:{:?}",card.masked_card.clone());
+            // println!("restored card {:?}",masked_card);
+
+            let pp = PedersenProof{
+                a: card.proof.a,
+                b:card.proof.b,
+                r:card.proof.r,
+            };
+
+            let proof = pp.to_curve()?;
+            cards.push((masked_card, proof));
+        }
+        Ok(cards)
+    }
 }
 
