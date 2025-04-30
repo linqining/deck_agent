@@ -362,8 +362,6 @@ impl MaskDeck {
         let mut cards:Vec<MaskedCardAndProofDTO> = Vec::with_capacity(deck_and_proofs.len());
         for deck_and_proof in deck_and_proofs {
             let card_hex = encode_masked_card(deck_and_proof.0)?;
-            // println!("cardHex:{:?}",card_hex);
-            // println!("origin card {:?}",deck_and_proof.0);
             let proof = PedersenProof::new(deck_and_proof.1);
             cards.push(MaskedCardAndProofDTO {
                 masked_card: card_hex,
@@ -384,7 +382,6 @@ impl MaskDeck {
         for card in self.cards.clone().into_iter(){
             let masked_card = decode_masked_card(card.masked_card.clone())?;
             // println!("decode card:{:?}",card.masked_card.clone());
-            // println!("restored card {:?}",masked_card);
 
             let pp = PedersenProof{
                 a: card.proof.a,

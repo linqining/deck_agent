@@ -72,7 +72,7 @@ pub fn encode_public_key(pk :PublicKey)->Result<String, SerializationError>{
 
 pub fn encode_masked_card(card :MaskedCard)->Result<String, SerializationError>{
     let mut bytes = Vec::new();
-    card.serialize_uncompressed(&mut bytes)?;
+    card.serialize(&mut bytes)?;
     Ok(hex::encode(&bytes))
 }
 

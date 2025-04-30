@@ -66,7 +66,6 @@ pub trait DeckServiceTrait: Send + Sync {
 
     async fn mask(&self, mask_req: MaskRequest)->Result<MaskResponse,DeckCustomError>;
 
-    async fn generate_deck(&self, generate_deck_request: GenerateDeckRequest) -> Result<GenerateDeckResponse, DeckCustomError>;
 
     async fn shuffle (&self, shuffle_request: ShuffleRequest) -> Result<ShuffleResponse, DeckCustomError>;
 
@@ -238,40 +237,6 @@ impl DeckServiceTrait for DeckService {
         })
     }
 
-    // TODO verify deck proof
-    async fn generate_deck(&self, generate_deck_request: GenerateDeckRequest) -> Result<GenerateDeckResponse, DeckCustomError>{
-        // Each player should run this computation and verify that all players agree on the initial deck
-        let rng = &mut thread_rng();
-
-        let card_mapping = encode_cards(rng, 2*26);
-
-        let parameters = match CardProtocol::setup(rng, 2, 26){
-            Ok(p) => p,
-            Err(_e)=> return Err(DeckCustomError::GenericError(String::from("Internal")))
-        };
-        let join_key = match decode_public_key(generate_deck_request.joined_key.clone()){
-            Ok(p) => p,
-            Err(_e)=> return Err(DeckCustomError::InvalidPublicKey)
-        };
-
-        let deck_and_proofs:Vec<(MaskedCard, RemaskingProof)>   = match card_mapping
-            .keys()
-            .map(|card| <DLCards<ark_ec::short_weierstrass_jacobian::GroupProjective<StarkwareParameters>> as BarnettSmartProtocol>::mask(rng, &parameters, &join_key, &card, &Scalar::one()))
-            .collect::<Result<Vec<_>, _>>(){
-            Ok(p) => p,
-            Err(_e)=> return Err(DeckCustomError::InvalidProof)
-        };
-
-
-        let deck_dto = match    InitialDeck::new(deck_and_proofs){
-            Ok(p)=>p,
-            Err(e)=>return Err(DeckCustomError::SerializationError(e.to_string()))
-        };
-
-        Ok(GenerateDeckResponse{
-            deck:deck_dto,
-        })
-    }
     async fn shuffle(&self, shuffle_request: ShuffleRequest) -> Result<ShuffleResponse, DeckCustomError> {
         let joined_key = match decode_public_key(shuffle_request.joined_key.clone()){
             Ok(p) => p,
