@@ -12,6 +12,7 @@ pub enum DeckCustomError {
     GenericError(String),
     SerializationError(String),
     InvalidSeed,
+    InvalidRevealToken,
 }
 
 impl fmt::Display for DeckCustomError {
@@ -25,6 +26,7 @@ impl fmt::Display for DeckCustomError {
             DeckCustomError::UserNotFound => write!(f, "User not found"),
             DeckCustomError::InvalidSeed => write!(f, "invalid seed"),
             DeckCustomError::InvalidCard => write!(f, "invalid card"),
+            DeckCustomError::InvalidRevealToken=> write!(f, "invald token"),
         }
     }
 }

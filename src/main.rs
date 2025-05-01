@@ -74,4 +74,5 @@ async fn rocket() -> _ {
         .mount("/",routes![deck::routes::mask])
         .mount("/",routes![deck::routes::shuffle])
         .mount("/",routes![deck::routes::verify_shuffle])
+        .mount("/",routes![deck::routes::reveal_token])
 }

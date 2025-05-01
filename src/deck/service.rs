@@ -10,11 +10,11 @@ use rand_core::{CryptoRngCore, RngCore, SeedableRng};
 use rocket::data::ToByteUnit;
 use rocket::futures::TryFutureExt;
 use rocket::yansi::Paint;
-use crate::deck::models::deck_case::deck::{SetUpDeckResponse, MaskResponse, ComputeAggregateKeyResponse, GenerateDeckRequest, GenerateDeckResponse, InitialDeck, MaskedCardAndProofDTO as CardDTO, ShuffleRequest, ShuffleResponse, VerifyShuffleRequest, VerifyShuffleResponse, ShuffledDeck, RevealCardsRequest, RevealCardsResponse, OpenCardsRequest, OpenCardsResponse, RevealedDeck, PeekCardsRequest, PeekCardsResponse, ReceiveAndRevealTokenRequest, ReceiveAndRevealTokenResponse, InitialDeckRequest, InitialDeckResponse, InitialCard, Proof, MaskDeck};
+use crate::deck::models::deck_case::deck::{SetUpDeckResponse, MaskResponse, ComputeAggregateKeyResponse, GenerateDeckRequest, GenerateDeckResponse, InitialDeck, MaskedCardAndProofDTO as CardDTO, ShuffleRequest, ShuffleResponse, VerifyShuffleRequest, VerifyShuffleResponse, ShuffledDeck, RevealCardsRequest, RevealCardsResponse, OpenCardsRequest, OpenCardsResponse, RevealedDeck, PeekCardsRequest, PeekCardsResponse, RevealTokenRequest, RevealTokenResponse, InitialDeckRequest, InitialDeckResponse, InitialCard, Proof, MaskDeck, RevealTokenDTO};
 use ark_serialize::{CanonicalSerialize,CanonicalDeserialize};
 use asn1_der::typed::DerEncodable;
 use starknet_curve::{Affine, StarkwareParameters};
-use crate::serialize::serialize::{encode_public_key, decode_public_key, decode_deck_public_key, decode_masked_card, encode_masked_card, encode_masking_proof, decode_shuffle_proof, encode_shuffle_proof, encode_initial_card, decode_initial_card};
+use crate::serialize::serialize::{encode_public_key, decode_public_key, decode_deck_public_key, decode_masked_card, encode_masked_card, encode_masking_proof, decode_shuffle_proof, encode_shuffle_proof, encode_initial_card, decode_initial_card, encode_revel_token, encode_revel_proof};
 
 use proof_essentials::homomorphic_encryption::{
     el_gamal, el_gamal::ElGamal, HomomorphicEncryptionScheme,
@@ -71,7 +71,7 @@ pub trait DeckServiceTrait: Send + Sync {
 
 
     // user receive their and need to reveal others card at the same time
-    async fn receive_and_reveal_token(&self, receive_and_reveal_token_request: ReceiveAndRevealTokenRequest)->Result<ReceiveAndRevealTokenResponse, DeckCustomError>;
+    async fn reveal_token(&self, reveal_token_request: RevealTokenRequest) ->Result<RevealTokenResponse, DeckCustomError>;
     async fn reveal_cards(&self,reveal_cards_request:  RevealCardsRequest)->Result<RevealCardsResponse, DeckCustomError>;
 
     async fn peek_cards(&self,peek_cards_request: PeekCardsRequest) -> Result<PeekCardsResponse, DeckCustomError>;
@@ -324,29 +324,43 @@ impl DeckServiceTrait for DeckService {
         Ok(VerifyShuffleResponse{})
     }
 
-    async fn receive_and_reveal_token(&self, receive_and_reveal_token_request: ReceiveAndRevealTokenRequest)->Result<ReceiveAndRevealTokenResponse, DeckCustomError>{
-        let game_user_id = receive_and_reveal_token_request.game_user_id.clone();
-        let reveal_response = self.reveal_cards(RevealCardsRequest{
-            game_user_id,
-            shuffled_deck: receive_and_reveal_token_request.shuffled_deck,
-        }).await?;
+    async fn reveal_token(&self, reveal_token_req: RevealTokenRequest) ->Result<RevealTokenResponse, DeckCustomError>{
+        let mut restored_rng = restore_rnd(reveal_token_req.seed_hex)?;
+        let parameters = match CardProtocol::setup(&mut restored_rng, 2, 26){
+            Ok(p) => p,
+            Err(_e)=> return Err(DeckCustomError::GenericError(String::from("Internal")))
+        };
 
-        let mut  user_db = self.user_db.lock().unwrap(); // 守卫生命周期开始
-        let get_user_result = user_db.get(&receive_and_reveal_token_request.game_user_id.clone());
-        let mut user = match get_user_result{
-            Some(game_user) => game_user.clone(),
+        let game_user_id = reveal_token_req.game_user_id.clone();
+        let user_db = self.user_db.lock().unwrap(); // 守卫生命周期开始
+        let get_user_result = user_db.get(&game_user_id);      // 守卫未释放，引用有效
+        let user = match get_user_result{
+            Some(game_user) => game_user,
             None => return Err(DeckCustomError::UserNotFound),
         };
-        for card_dto in receive_and_reveal_token_request.received_cards{
-            let masked_card = match decode_masked_card(card_dto.masked_card){
+        let user_private_key = user.private_key.clone();
+        let user_public_key = user.public_key.clone();
+
+        let mut reveal_token_map = HashMap::new();
+        for card_dto in reveal_token_req.reveal_cards{
+            let masked_card = match decode_masked_card(card_dto.clone()){
                 Ok(p) => p,
                 Err(_e)=> return Err(DeckCustomError::InvalidProof)
             };
-            user.cards.push(masked_card);
+            let reveal_token = match CardProtocol::compute_reveal_token(&mut restored_rng,&parameters,&user_private_key,&user_public_key,&masked_card){
+                Ok(p) => p,
+                Err(_e)=> return Err(DeckCustomError::GenericError(String::from("Internal")))
+            };
+            let token = encode_revel_token(reveal_token.0)?;
+            let proof = encode_revel_proof(reveal_token.1)?;
+            reveal_token_map.insert(card_dto, RevealTokenDTO{
+                token:token,
+                proof: proof,
+            });
         }
-        user_db.insert(receive_and_reveal_token_request.game_user_id.clone(),user);
-        Ok(ReceiveAndRevealTokenResponse{
-            revealed_deck:reveal_response.revealed_deck,
+
+        Ok(RevealTokenResponse {
+            token_map: reveal_token_map,
         })
     }
 

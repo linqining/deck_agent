@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::ffi::c_void;
 use std::io::{Read, Write};
 use ark_ec::short_weierstrass_jacobian::GroupAffine;
@@ -19,6 +20,7 @@ type ProofKeyOwnership = schnorr_identification::proof::Proof<Curve>;
 type RemaskingProof = chaum_pedersen_dl_equality::proof::Proof<Curve>;
 type RevealProof = chaum_pedersen_dl_equality::proof::Proof<Curve>;
 use crate::deck::errors::DeckCustomError;
+use crate::deck::models::deck::Deck;
 use crate::game_user::models::game_user::GameUser;
 use crate::serialize::proof::{IdentityProof, PedersenProof};
 use crate::serialize::serialize::{decode_masked_card, decode_masking_proof, decode_revel_proof, decode_revel_token, encode_masked_card, encode_masking_proof, encode_revel_token};
@@ -145,7 +147,7 @@ pub struct InitialDeck {
 }
 
 impl InitialDeck {
-    pub fn new(deck_and_proofs :Vec<(MaskedCard, RemaskingProof)> )->Result<Self,SerializationError>{
+    pub fn new(deck_and_proofs :Vec<(MaskedCard, RemaskingProof)> )->Result<Self,DeckCustomError>{
         let mut cards:Vec<InitCardAndProofDTO> = Vec::with_capacity(deck_and_proofs.len());
         for deck_and_proof in deck_and_proofs {
             let card_hex = encode_masked_card(deck_and_proof.0)?;
@@ -183,7 +185,7 @@ pub struct ShuffledDeck {
 }
 
 impl ShuffledDeck {
-    pub fn new(masked_cards :Vec<MaskedCard>)->Result<Self,SerializationError>{
+    pub fn new(masked_cards :Vec<MaskedCard>)->Result<Self,DeckCustomError>{
         let mut cards:Vec<crate::deck::models::deck_case::deck::MaskedCardDTO> = Vec::with_capacity(masked_cards.len());
         for masked_card in masked_cards{
             let card_hex = encode_masked_card(masked_card)?;
@@ -258,14 +260,19 @@ pub struct RevealCardsResponse{
 
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ReceiveAndRevealTokenRequest{
-    pub game_user_id:String,
-    pub received_cards: Vec<MaskedCardDTO>,
-    pub shuffled_deck: ShuffledDeck,
+pub struct RevealTokenRequest {
+    pub game_user_id: String,
+    pub seed_hex: String,
+    pub reveal_cards: Vec<String>,
 }
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ReceiveAndRevealTokenResponse{
-    pub revealed_deck: RevealedDeck,
+pub struct RevealTokenDTO{
+    pub token:String,
+    pub proof:String,
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RevealTokenResponse {
+    pub token_map: HashMap<String, RevealTokenDTO>,
 }
 
 
@@ -292,10 +299,13 @@ pub struct RevealedCardAndProofDTO {
 }
 
 impl RevealedDeck {
-    pub fn new(deck_and_proofs :Vec<(MaskedCard,RevealToken, RevealProof)> )->Result<Self,SerializationError>{
+    pub fn new(deck_and_proofs :Vec<(MaskedCard,RevealToken, RevealProof)> )->Result<Self,DeckCustomError>{
         let mut cards:Vec<crate::deck::models::deck_case::deck::RevealedCardAndProofDTO> = Vec::with_capacity(deck_and_proofs.len());
         for deck_and_proof in deck_and_proofs {
-            let card_hex = encode_masked_card(deck_and_proof.0)?;
+            let card_hex = match encode_masked_card(deck_and_proof.0){
+                Ok(revealed_card) => revealed_card,
+                Err(_e) => return Err(DeckCustomError::InvalidCard),
+            };
 
             let revel_token_hex = encode_revel_token(deck_and_proof.1)?;
 
@@ -314,7 +324,7 @@ impl RevealedDeck {
             cards:cards,
         })
     }
-    pub fn into_masked_card(&self)-> Result<Vec<(RevealToken, RevealProof)>,ark_serialize::SerializationError>{
+    pub fn into_masked_card(&self)-> Result<Vec<(RevealToken, RevealProof)>,DeckCustomError>{
         let card_length = self.cards.len();
         let mut cards =Vec::with_capacity(card_length);
         for card in self.cards.clone(){
@@ -361,7 +371,7 @@ pub struct MaskDeck {
 }
 
 impl MaskDeck {
-    pub fn new(deck_and_proofs :Vec<(MaskedCard, RemaskingProof)> )->Result<Self,SerializationError>{
+    pub fn new(deck_and_proofs :Vec<(MaskedCard, RemaskingProof)> )->Result<Self,DeckCustomError>{
         let mut cards:Vec<MaskedCardAndProofDTO> = Vec::with_capacity(deck_and_proofs.len());
         for deck_and_proof in deck_and_proofs {
             let card_hex = encode_masked_card(deck_and_proof.0)?;

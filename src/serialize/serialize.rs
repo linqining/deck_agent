@@ -70,10 +70,12 @@ pub fn encode_public_key(pk :PublicKey)->Result<String, SerializationError>{
     Ok(hex::encode(&bytes))
 }
 
-pub fn encode_masked_card(card :MaskedCard)->Result<String, SerializationError>{
+pub fn encode_masked_card(card :MaskedCard)->Result<String, DeckCustomError>{
     let mut bytes = Vec::new();
-    card.serialize(&mut bytes)?;
-    Ok(hex::encode(&bytes))
+   match card.serialize(&mut bytes){
+       Ok(()) => return Ok(hex::encode(&bytes)),
+       Err(e)=> return Err(DeckCustomError::InvalidCard),
+   }
 }
 
 pub fn decode_masked_card(card_hex: String) ->Result<MaskedCard, DeckCustomError>{
@@ -88,10 +90,12 @@ pub fn decode_masked_card(card_hex: String) ->Result<MaskedCard, DeckCustomError
     Ok(restored_result)
 }
 
-pub fn encode_masking_proof(proof: RemaskingProof)->Result<String, SerializationError>{
+pub fn encode_masking_proof(proof: RemaskingProof)->Result<String, DeckCustomError>{
     let mut bytes = Vec::new();
-    proof.serialize_uncompressed(&mut bytes)?;
-    Ok(hex::encode(&bytes))
+    match proof.serialize_uncompressed(&mut bytes){
+        Ok(_) => return Ok(hex::encode(&bytes)),
+        Err(_err)   => return  Err(DeckCustomError::InvalidProof)
+    }
 }
 
 pub fn decode_masking_proof(proof_hex: String) ->Result<RemaskingProof, ark_serialize::SerializationError>{
@@ -117,34 +121,44 @@ pub fn encode_shuffle_proof(proof: &ZKShuffleProof) ->Result<String, Serializati
     Ok(hex::encode(&bytes))
 }
 
-pub fn encode_revel_token(token :RevealToken)->Result<String, SerializationError>{
+pub fn encode_revel_token(token :RevealToken)->Result<String, DeckCustomError>{
     let mut bytes = Vec::new();
-    token.serialize_uncompressed(&mut bytes)?;
+    if let Err(e) =  token.serialize(&mut bytes){
+        return Err(DeckCustomError::InvalidRevealToken);
+    }
     Ok(hex::encode(&bytes))
 }
 
-pub fn decode_revel_token(token_hex :String)->Result<RevealToken, SerializationError>{
+pub fn decode_revel_token(token_hex :String)->Result<RevealToken, DeckCustomError>{
     let bytes = match Vec::from_hex(token_hex){
         Ok(bytes) => bytes,
-        Err(_err)    => return Err(ark_serialize::SerializationError::InvalidData)
+        Err(_err)    => return Err(DeckCustomError::InvalidRevealToken)
     };
-    let restored_result = RevealToken::deserialize(bytes.reader());
-    restored_result
+    let restored_result = match RevealToken::deserialize(bytes.reader()){
+        Ok(bytes) => bytes,
+        Err(_err)    => return Err(DeckCustomError::InvalidRevealToken)
+    };
+    Ok(restored_result)
 }
 
-pub fn encode_revel_proof(proof :RevealProof)->Result<String, SerializationError>{
+pub fn encode_revel_proof(proof :RevealProof)->Result<String, DeckCustomError>{
     let mut bytes = Vec::new();
-    proof.serialize_uncompressed(&mut bytes)?;
+    if let Err(_e)= proof.serialize(&mut bytes){
+        return Err(DeckCustomError::InvalidProof);
+    };
     Ok(hex::encode(&bytes))
 }
 
-pub fn decode_revel_proof(proof_hex :String)->Result<RevealProof, SerializationError>{
+pub fn decode_revel_proof(proof_hex :String)->Result<RevealProof, DeckCustomError>{
     let bytes = match Vec::from_hex(proof_hex){
         Ok(bytes) => bytes,
-        Err(_err)    => return Err(ark_serialize::SerializationError::InvalidData)
+        Err(_err)    => return Err(DeckCustomError::InvalidProof)
     };
-    let restored_result = RevealProof::deserialize(bytes.reader());
-    restored_result
+    let restored_result = match RevealProof::deserialize(bytes.reader()){
+        Ok(bytes) => bytes,
+        Err(_err)    => return Err(DeckCustomError::InvalidProof)
+    };
+    Ok(restored_result)
 }
 
 pub fn encode_initial_card(card :Card)->Result<String, SerializationError>{

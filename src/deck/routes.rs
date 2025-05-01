@@ -1,8 +1,9 @@
+use barnett_smart_card_protocol::Reveal;
 use rocket::response::status;
 use rocket::{ State, http::Status};
 use rocket::serde::json::Json;
 
-use crate::deck::models::deck_case::deck::{ComputeAggregateKeyRequest, ComputeAggregateKeyResponse, InitialDeckRequest, InitialDeckResponse, MaskRequest, MaskResponse, SetUpDeckRequest, SetUpDeckResponse, ShuffleRequest, ShuffleResponse, VerifyShuffleRequest, VerifyShuffleResponse};
+use crate::deck::models::deck_case::deck::{ComputeAggregateKeyRequest, ComputeAggregateKeyResponse, InitialDeckRequest, InitialDeckResponse, MaskRequest, MaskResponse, RevealTokenRequest, RevealTokenResponse, SetUpDeckRequest, SetUpDeckResponse, ShuffleRequest, ShuffleResponse, VerifyShuffleRequest, VerifyShuffleResponse};
 use crate::user::service::UserServiceTrait;
 use crate::core::api_response::ErrorResponse;
 use crate::deck::errors::DeckCustomError;
@@ -151,6 +152,30 @@ pub async fn verify_shuffle(deck_service: &State<Box<dyn DeckServiceTrait>>,veri
 
     Ok(status::Custom(Status::Ok, Json(VerifyShuffleResponse {
         ..verify_shuffle_response
+    })))
+}
+
+#[post("/deck/reveal_token", data = "<revel_token_req>")]
+pub async fn reveal_token(deck_service: &State<Box<dyn DeckServiceTrait>>,revel_token_req: Json<RevealTokenRequest> ) -> Result<status::Custom<Json<RevealTokenResponse>>, status::Custom<Json<ErrorResponse>>> {
+    let reveal_token_request = RevealTokenRequest {
+        ..revel_token_req.into_inner()
+    };
+    let reveal_token_response = deck_service.reveal_token(reveal_token_request).await;
+    let reveal_token_response = match reveal_token_response {
+        Ok(response) => response,
+        Err(err) => {
+            match err {
+                DeckCustomError::GenericError(msg) => return Err(status::Custom(Status::InternalServerError, Json(ErrorResponse { message: msg }))),
+                DeckCustomError::MissingFields(msg) => return Err(status::Custom(Status::BadRequest, Json(ErrorResponse { message: format!("The following properties are required: {}", msg) }))),
+                DeckCustomError::InvalidPublicKey => return Err(status::Custom(Status::BadRequest,Json(ErrorResponse{message: format!("invalid public key")}))),
+                DeckCustomError::InvalidProof=>return Err(status::Custom(Status::BadRequest,Json(ErrorResponse{message: format!("invalid proof")}))),
+                _ => return Err(status::Custom(Status::InternalServerError, Json(ErrorResponse { message: err.to_string() }))),
+            }
+        }
+    };
+
+    Ok(status::Custom(Status::Ok, Json(RevealTokenResponse {
+        ..reveal_token_response
     })))
 }
 
