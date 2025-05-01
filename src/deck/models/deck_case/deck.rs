@@ -222,8 +222,9 @@ pub struct GenerateDeckResponse{
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ShuffleRequest{
-    pub deck: ShuffledDeck,
+    pub seed_hex: String,
     pub joined_key: String,
+    pub cards: Vec<String>,
 }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ShuffleResponse{
@@ -381,7 +382,6 @@ impl MaskDeck {
         let mut cards =Vec::with_capacity(card_length);
         for card in self.cards.clone().into_iter(){
             let masked_card = decode_masked_card(card.masked_card.clone())?;
-            // println!("decode card:{:?}",card.masked_card.clone());
 
             let pp = PedersenProof{
                 a: card.proof.a,

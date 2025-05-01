@@ -8,6 +8,7 @@ use ark_ec::short_weierstrass_jacobian::{GroupAffine, GroupProjective};
 use ark_serialize::Write;
 use ark_serialize::Read;
 use ark_ff::{bytes::{FromBytes, ToBytes}};
+use proof_essentials::zkp::arguments::shuffle;
 use crate::deck::errors::DeckCustomError;
 
 type Curve = starknet_curve::Projective;
@@ -15,6 +16,10 @@ type ZKProof = schnorr_identification::proof::Proof<Curve>;
 type ZKProofMasking = chaum_pedersen_dl_equality::proof::Proof<Curve>;
 type Affine = starknet_curve::Affine;
 type Scalar = <ark_ec::short_weierstrass_jacobian::GroupAffine<StarkwareParameters> as AffineCurve>::ScalarField;
+// type CardProtocol = barnett_smart_card_protocol::discrete_log_cards::DLCards<Curve>;
+//
+// type ZKProofShuffle = shuffle::proof::Proof<CardProtocol::Scalar, CardProtocol::Enc, CardProtocol::Comm>;
+
 
 
 
@@ -123,7 +128,3 @@ impl PedersenProof {
         })
     }
 }
-
-
-
-

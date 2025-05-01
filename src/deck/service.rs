@@ -65,8 +65,6 @@ pub trait DeckServiceTrait: Send + Sync {
     async fn compute_aggregate_key(&self,compute_agg_key: ComputeAggregateKeyRequest)->Result<ComputeAggregateKeyResponse,DeckCustomError>;
 
     async fn mask(&self, mask_req: MaskRequest)->Result<MaskResponse,DeckCustomError>;
-
-
     async fn shuffle (&self, shuffle_request: ShuffleRequest) -> Result<ShuffleResponse, DeckCustomError>;
 
     async fn verify_shuffle(&self, verify_shuffle_request: VerifyShuffleRequest) -> Result<VerifyShuffleResponse, DeckCustomError>;
@@ -238,30 +236,30 @@ impl DeckServiceTrait for DeckService {
     }
 
     async fn shuffle(&self, shuffle_request: ShuffleRequest) -> Result<ShuffleResponse, DeckCustomError> {
-        let joined_key = match decode_public_key(shuffle_request.joined_key.clone()){
-            Ok(p) => p,
-            Err(_e)=> return Err(DeckCustomError::InvalidPublicKey)
-        };
-        let pmrng1 =&mut  thread_rng();
-        let maskrng1 =&mut  thread_rng();
-        let shufflerng1 = &mut thread_rng();
-        let rng = &mut thread_rng();
-        let parameters = match CardProtocol::setup(rng, 2, 26){
+        let mut restored_rng = restore_rnd(shuffle_request.seed_hex)?;
+        let parameters = match CardProtocol::setup(&mut restored_rng, 2, 26){
             Ok(p) => p,
             Err(_e)=> return Err(DeckCustomError::GenericError(String::from("Internal")))
         };
+        let joint_pk = decode_deck_public_key(shuffle_request.joined_key.clone())?;
 
-        let deck= match shuffle_request.deck.into_masked_card(){
-            Ok(p) => p,
-            Err(_e)=> return Err(DeckCustomError::InvalidProof)
-        };
+        let pmrng =&mut  thread_rng();
+        let maskrng =&mut  thread_rng();
+        let shufflerng = &mut thread_rng();
 
-        let permutation = Permutation::new(pmrng1, 2 * 26);
-        let masking_factors: Vec<Scalar> = sample_vector(maskrng1, 2 * 26);
+        let mut deck = Vec::with_capacity(shuffle_request.cards.len());
+
+        for card in shuffle_request.cards {
+            let maked_card = decode_masked_card(card)?;
+            deck.push(maked_card);
+        }
+
+        let permutation = Permutation::new(pmrng, 2 * 26);
+        let masking_factors: Vec<Scalar> = sample_vector(maskrng, 2 * 26);
         let (a_shuffled_deck, a_shuffle_proof) = match CardProtocol::shuffle_and_remask(
-            shufflerng1,
+            shufflerng,
             &parameters,
-            &joined_key,
+            &joint_pk,
             &deck,
             &masking_factors,
             &permutation,

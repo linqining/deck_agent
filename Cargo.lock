@@ -1947,7 +1947,7 @@ dependencies = [
 [[package]]
 name = "proof-essentials"
 version = "0.1.0"
-source = "git+https://github.com/linqining/proof-toolbox.git?branch=develop#f74ce1f8f488690b48f966dbe28d689e836af313"
+source = "git+https://github.com/linqining/proof-toolbox.git?branch=develop#57622cd23ce0c3d9d4eacc17f290ec950fccb7c9"
 dependencies = [
  "ark-crypto-primitives",
  "ark-ec",
@@ -2488,9 +2488,9 @@ dependencies = [
 
 [[package]]
 name = "sha2"
-version = "0.10.8"
+version = "0.10.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "793db75ad2bcafc3ffa7c68b215fee268f537982cd901d132f89c6343f3a3dc8"
+checksum = "a7507d819769d01a365ab707794a4084392c824f54a7a6a7862f8c3d0892b283"
 dependencies = [
  "cfg-if",
  "cpufeatures",
@@ -2580,7 +2580,7 @@ checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 [[package]]
 name = "starknet-curve"
 version = "0.1.0"
-source = "git+https://github.com/linqining/proof-toolbox.git?branch=develop#f74ce1f8f488690b48f966dbe28d689e836af313"
+source = "git+https://github.com/linqining/proof-toolbox.git?branch=develop#57622cd23ce0c3d9d4eacc17f290ec950fccb7c9"
 dependencies = [
  "ark-ec",
  "ark-ff",
@@ -2644,9 +2644,9 @@ dependencies = [
 
 [[package]]
 name = "synstructure"
-version = "0.13.1"
+version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8af7666ab7b6390ab78131fb5b0fce11d6b7a6951602017c35fa82800708971"
+checksum = "728a70f3dbaf5bab7f0c4b1ac8d7ae5ea60a4b5549c8a5914361c99147a709d2"
 dependencies = [
  "proc-macro2",
  "quote",

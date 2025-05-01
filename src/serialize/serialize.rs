@@ -113,7 +113,7 @@ pub fn decode_shuffle_proof(proof_hex: String)->Result<ZKShuffleProof, Serializa
 }
 pub fn encode_shuffle_proof(proof: &ZKShuffleProof) ->Result<String, SerializationError>{
     let mut bytes = Vec::new();
-    proof.serialize_uncompressed(&mut bytes)?;
+    proof.serialize(&mut bytes)?;
     Ok(hex::encode(&bytes))
 }
 

@@ -2,7 +2,7 @@ use rocket::response::status;
 use rocket::{ State, http::Status};
 use rocket::serde::json::Json;
 
-use crate::deck::models::deck_case::deck::{ComputeAggregateKeyRequest, ComputeAggregateKeyResponse, InitialDeckRequest, InitialDeckResponse, MaskRequest, MaskResponse, SetUpDeckRequest, SetUpDeckResponse};
+use crate::deck::models::deck_case::deck::{ComputeAggregateKeyRequest, ComputeAggregateKeyResponse, InitialDeckRequest, InitialDeckResponse, MaskRequest, MaskResponse, SetUpDeckRequest, SetUpDeckResponse, ShuffleRequest, ShuffleResponse};
 use crate::user::service::UserServiceTrait;
 use crate::core::api_response::ErrorResponse;
 use crate::deck::errors::DeckCustomError;
@@ -103,6 +103,30 @@ pub async fn mask(deck_service: &State<Box<dyn DeckServiceTrait>>,mask_req: Json
 
     Ok(status::Custom(Status::Created, Json(MaskResponse {
         ..mask_response
+    })))
+}
+
+#[post("/deck/shuffle", data = "<shuffle_req>")]
+pub async fn shuffle(deck_service: &State<Box<dyn DeckServiceTrait>>,shuffle_req: Json<ShuffleRequest> ) -> Result<status::Custom<Json<ShuffleResponse>>, status::Custom<Json<ErrorResponse>>> {
+    let shuffle_request = ShuffleRequest {
+        ..shuffle_req.into_inner()
+    };
+    let shuffle_response = deck_service.shuffle(shuffle_request).await;
+    let shuffle_response = match shuffle_response {
+        Ok(response) => response,
+        Err(err) => {
+            match err {
+                DeckCustomError::GenericError(msg) => return Err(status::Custom(Status::InternalServerError, Json(ErrorResponse { message: msg }))),
+                DeckCustomError::MissingFields(msg) => return Err(status::Custom(Status::BadRequest, Json(ErrorResponse { message: format!("The following properties are required: {}", msg) }))),
+                DeckCustomError::InvalidPublicKey => return Err(status::Custom(Status::BadRequest,Json(ErrorResponse{message: format!("invalid public key")}))),
+                DeckCustomError::InvalidProof=>return Err(status::Custom(Status::BadRequest,Json(ErrorResponse{message: format!("invalid proof")}))),
+                _ => return Err(status::Custom(Status::InternalServerError, Json(ErrorResponse { message: err.to_string() }))),
+            }
+        }
+    };
+
+    Ok(status::Custom(Status::Created, Json(ShuffleResponse {
+        ..shuffle_response
     })))
 }
 

@@ -16,8 +16,10 @@ ark-std = { version = "0.3.0", features = ["std"] }
 blake2 = { version = "0.9", default-features = false }
 merlin = "3.0.0"
 proof-essentials = { git = "https://github.com/linqining/proof-toolbox.git", branch = "develop"}
+#proof-essentials = { path = "/Users/mac/projects/proof-toolbox"}
 rand = "0.8.4"
 starknet-curve = { git = "https://github.com/linqining/proof-toolbox.git",branch="develop"}
+#starknet-curve = { path = "/Users/mac/projects/proof-toolbox"}
 thiserror = "1.0.30"
 serde = "1.0"
 serde_json = "1.0"
@@ -26,6 +28,7 @@ mongodb = "2.8"
 bcrypt = "0.15.0"
 dotenv = "0.15.0"
 barnett-smart-card-protocol = { git = "https://github.com/linqining/mental-poker-rust.git",branch="develop" }
+#barnett-smart-card-protocol = {path = "/Users/mac/projects/rust/mental-poker/barnett-smart-card-protocol"}
 rand_chacha = "0.3.1"
 rand_core = "0.6.4"
 bincode = "1.3.3"
