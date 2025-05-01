@@ -228,16 +228,17 @@ pub struct ShuffleRequest{
 }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ShuffleResponse{
-    pub deck: ShuffledDeck,
     pub shuffle_proof: String,
+    pub cards: Vec<String>,
 }
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct VerifyShuffleRequest{
-    pub proof: String,
     pub joined_key: String,
     pub seed_hex: String,
-    pub origin_deck: ShuffledDeck,
-    pub shuffled_deck: ShuffledDeck,
+    pub proof: String,
+    pub origin_cards:  Vec<String>,
+    pub shuffled_cards:  Vec<String>,
 }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct VerifyShuffleResponse{

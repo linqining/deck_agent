@@ -248,7 +248,6 @@ impl DeckServiceTrait for DeckService {
         let shufflerng = &mut thread_rng();
 
         let mut deck = Vec::with_capacity(shuffle_request.cards.len());
-
         for card in shuffle_request.cards {
             let maked_card = decode_masked_card(card)?;
             deck.push(maked_card);
@@ -278,9 +277,12 @@ impl DeckServiceTrait for DeckService {
             Ok(p) => p,
             Err(_e)=> return Err(DeckCustomError::GenericError(String::from("Internal")))
         };
+        let shuffled_cards = shuffle_deck_dto.cards.iter()
+            .map(|x| x.masked_card.clone())
+            .collect::<Vec<String>>();
 
         Ok(ShuffleResponse{
-            deck: shuffle_deck_dto,
+            cards: shuffled_cards,
             shuffle_proof:proof_hex,
         })
     }
@@ -302,15 +304,19 @@ impl DeckServiceTrait for DeckService {
             Err(_e)=> return Err(DeckCustomError::InvalidPublicKey)
         };
 
-        let origin_deck= match verify_shuffle_request.origin_deck.into_masked_card(){
-            Ok(p) => p,
-            Err(_e)=> return Err(DeckCustomError::InvalidProof)
-        };
 
-        let shuffled_deck= match verify_shuffle_request.shuffled_deck.into_masked_card(){
-            Ok(p) => p,
-            Err(_e)=> return Err(DeckCustomError::InvalidProof)
-        };
+
+        let mut origin_deck = Vec::with_capacity(verify_shuffle_request.origin_cards.len());
+        for card in verify_shuffle_request.origin_cards {
+            let maked_card = decode_masked_card(card)?;
+            origin_deck.push(maked_card);
+        }
+
+        let mut shuffled_deck = Vec::with_capacity(verify_shuffle_request.shuffled_cards.len());
+        for card in verify_shuffle_request.shuffled_cards {
+            let maked_card = decode_masked_card(card)?;
+            shuffled_deck.push(maked_card);
+        }
 
         if  let Err(_e)= CardProtocol::verify_shuffle(&parameters,&joined_key,&origin_deck,&shuffled_deck, &proof){
             return Err(DeckCustomError::InvalidProof)
@@ -411,6 +417,7 @@ use asn1_der::e;
 use proof_essentials::vector_commitment::pedersen::PedersenCommitment;
 use proof_essentials::zkp::arguments::shuffle;
 use proof_essentials::zkp::proofs::{chaum_pedersen_dl_equality, schnorr_identification};
+use rocket::http::ext::IntoCollection;
 use crate::game_user::models::game_user::GameUser;
 use crate::serialize::proof::{IdentityProof};
 use crate::user::errors::CustomError;
