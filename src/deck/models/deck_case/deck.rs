@@ -235,6 +235,7 @@ pub struct ShuffleResponse{
 pub struct VerifyShuffleRequest{
     pub proof: String,
     pub joined_key: String,
+    pub seed_hex: String,
     pub origin_deck: ShuffledDeck,
     pub shuffled_deck: ShuffledDeck,
 }

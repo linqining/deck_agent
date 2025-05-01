@@ -290,8 +290,9 @@ impl DeckServiceTrait for DeckService {
            Ok(p) => p,
            Err(_e)=> return Err(DeckCustomError::InvalidProof)
        };
-        let rng = &mut thread_rng();
-        let parameters = match CardProtocol::setup(rng, 2, 26){
+
+        let mut restored_rng = restore_rnd(verify_shuffle_request.seed_hex)?;
+        let parameters = match CardProtocol::setup(&mut restored_rng, 2, 26){
             Ok(p) => p,
             Err(_e)=> return Err(DeckCustomError::GenericError(String::from("Internal")))
         };
