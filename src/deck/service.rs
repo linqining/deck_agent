@@ -14,7 +14,7 @@ use crate::deck::models::deck_case::deck::{SetUpDeckResponse, MaskResponse, Comp
 use ark_serialize::{CanonicalSerialize,CanonicalDeserialize};
 use asn1_der::typed::DerEncodable;
 use starknet_curve::{Affine, StarkwareParameters};
-use crate::serialize::serialize::{encode_public_key, decode_public_key, decode_deck_public_key, decode_masked_card, encode_masked_card, encode_masking_proof, decode_shuffle_proof, encode_shuffle_proof, encode_initial_card, decode_initial_card, encode_revel_token, encode_revel_proof};
+use crate::serialize::serialize::{encode_public_key, decode_public_key, decode_deck_public_key, decode_masked_card, encode_masked_card, encode_masking_proof, decode_shuffle_proof, encode_shuffle_proof, encode_initial_card, decode_initial_card, encode_revel_token, encode_revel_proof, decode_revel_token};
 
 use proof_essentials::homomorphic_encryption::{
     el_gamal, el_gamal::ElGamal, HomomorphicEncryptionScheme,
@@ -353,9 +353,14 @@ impl DeckServiceTrait for DeckService {
             };
             let token = encode_revel_token(reveal_token.0)?;
             let proof = encode_revel_proof(reveal_token.1)?;
+            let pub_key_hex = match encode_public_key(user_public_key){
+                Ok(p) => p,
+                Err(_e)=> return Err(DeckCustomError::InvalidPublicKey)
+            };
             reveal_token_map.insert(card_dto, RevealTokenDTO{
                 token:token,
                 proof: proof,
+                public_key:pub_key_hex,
             });
         }
 
@@ -405,9 +410,53 @@ impl DeckServiceTrait for DeckService {
 
 
     async fn peek_cards(&self,peek_cards_request: PeekCardsRequest) -> Result<PeekCardsResponse, DeckCustomError>{
-        todo!()
-    }
+        let mut restored_rng = restore_rnd(peek_cards_request.seed_hex)?;
+        let parameters= match   CardProtocol::setup(&mut restored_rng, 2, 26){
+            Ok(p) => p,
+            Err(_e)=> return Err(DeckCustomError::InvalidProof)
+        };
 
+        let game_user_id = peek_cards_request.game_user_id.clone();
+
+        let user_db = self.user_db.lock().unwrap(); // 守卫生命周期开始
+        let get_user_result = user_db.get(&game_user_id);      // 守卫未释放，引用有效
+        let user = match get_user_result{
+            Some(game_user) => game_user,
+            None => return Err(DeckCustomError::UserNotFound),
+        };
+        let user_private_key = user.private_key.clone();
+        let user_public_key = user.public_key.clone();
+
+
+        for card  in peek_cards_request.peek_cards{
+            let mask_card = decode_masked_card(card.card)?;
+            let mut tokens = Vec::with_capacity(card.tokens.len()+1);
+            for token in card.tokens {
+                let reveal_token = decode_revel_token(token)?;
+                tokens.push(reveal_token);
+            }
+
+            let rng =   &mut thread_rng();
+            let (reveal_token, _reveal_proof) =
+                match CardProtocol::compute_reveal_token(rng, &parameters, &user_private_key, &user_public_key, &mask_card){
+                    Ok(p) => p,
+                    Err(_e)=> return Err(DeckCustomError::SerializationError(String::from("Internal")))
+                };
+            tokens.push(reveal_token);
+
+            // let unmasked_card = CardProtocol::unmask(&parameters, &tokens, &mask_card)?;
+            // let opened_card = card_mappings.get(&unmasked_card);
+            // let opened_card = opened_card.ok_or(GameErrors::InvalidCard)?;
+            //
+            // self.opened_cards[i] = Some(*opened_card);
+            // Ok(())
+        }
+
+        let card_map  = HashMap::new();
+        Ok(PeekCardsResponse{
+            card_map: card_map,
+        })
+    }
 
     async fn open_cards(&self,open_cards_request: OpenCardsRequest)->Result<OpenCardsResponse, DeckCustomError>{
         todo!();

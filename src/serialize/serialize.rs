@@ -27,8 +27,6 @@ type Parameters = <DLCards<ark_ec::short_weierstrass_jacobian::GroupProjective<S
 type PublicKey = GroupAffine<StarkwareParameters>;
 type PrivateKey = <ark_ec::short_weierstrass_jacobian::GroupAffine<StarkwareParameters> as AffineCurve>::ScalarField;
 
-use proof_essentials::utils::permutation::Permutation;
-use proof_essentials::utils::rand::sample_vector;
 
 
 

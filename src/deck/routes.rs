@@ -1,9 +1,10 @@
 use barnett_smart_card_protocol::Reveal;
 use rocket::response::status;
 use rocket::{ State, http::Status};
+use rocket::futures::stream::Peek;
 use rocket::serde::json::Json;
 
-use crate::deck::models::deck_case::deck::{ComputeAggregateKeyRequest, ComputeAggregateKeyResponse, InitialDeckRequest, InitialDeckResponse, MaskRequest, MaskResponse, RevealTokenRequest, RevealTokenResponse, SetUpDeckRequest, SetUpDeckResponse, ShuffleRequest, ShuffleResponse, VerifyShuffleRequest, VerifyShuffleResponse};
+use crate::deck::models::deck_case::deck::{ComputeAggregateKeyRequest, ComputeAggregateKeyResponse, InitialDeckRequest, InitialDeckResponse, MaskRequest, MaskResponse, PeekCardsRequest, PeekCardsResponse, RevealTokenRequest, RevealTokenResponse, SetUpDeckRequest, SetUpDeckResponse, ShuffleRequest, ShuffleResponse, VerifyShuffleRequest, VerifyShuffleResponse};
 use crate::user::service::UserServiceTrait;
 use crate::core::api_response::ErrorResponse;
 use crate::deck::errors::DeckCustomError;
@@ -176,6 +177,30 @@ pub async fn reveal_token(deck_service: &State<Box<dyn DeckServiceTrait>>,revel_
 
     Ok(status::Custom(Status::Ok, Json(RevealTokenResponse {
         ..reveal_token_response
+    })))
+}
+
+#[post("/deck/peek_cards", data = "<peek_cards_req>")]
+pub async fn peek_cards(deck_service: &State<Box<dyn DeckServiceTrait>>,peek_cards_req: Json<PeekCardsRequest> ) -> Result<status::Custom<Json<PeekCardsResponse>>, status::Custom<Json<ErrorResponse>>> {
+    let peek_cards_request = PeekCardsRequest {
+        ..peek_cards_req.into_inner()
+    };
+    let peek_card_response = deck_service.peek_cards(peek_cards_request).await;
+    let peek_card_response = match peek_card_response {
+        Ok(response) => response,
+        Err(err) => {
+            match err {
+                DeckCustomError::GenericError(msg) => return Err(status::Custom(Status::InternalServerError, Json(ErrorResponse { message: msg }))),
+                DeckCustomError::MissingFields(msg) => return Err(status::Custom(Status::BadRequest, Json(ErrorResponse { message: format!("The following properties are required: {}", msg) }))),
+                DeckCustomError::InvalidPublicKey => return Err(status::Custom(Status::BadRequest,Json(ErrorResponse{message: format!("invalid public key")}))),
+                DeckCustomError::InvalidProof=>return Err(status::Custom(Status::BadRequest,Json(ErrorResponse{message: format!("invalid proof")}))),
+                _ => return Err(status::Custom(Status::InternalServerError, Json(ErrorResponse { message: err.to_string() }))),
+            }
+        }
+    };
+
+    Ok(status::Custom(Status::Ok, Json(PeekCardsResponse {
+        ..peek_card_response
     })))
 }
 
