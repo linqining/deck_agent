@@ -10,11 +10,11 @@ use rand_core::{CryptoRngCore, RngCore, SeedableRng};
 use rocket::data::ToByteUnit;
 use rocket::futures::TryFutureExt;
 use rocket::yansi::Paint;
-use crate::deck::models::deck_case::deck::{SetUpDeckResponse, MaskResponse, ComputeAggregateKeyResponse, GenerateDeckRequest, GenerateDeckResponse, InitialDeck, MaskedCardAndProofDTO as CardDTO, ShuffleRequest, ShuffleResponse, VerifyShuffleRequest, VerifyShuffleResponse, ShuffledDeck, RevealCardsRequest, RevealCardsResponse, OpenCardsRequest, OpenCardsResponse, RevealedDeck, PeekCardsRequest, PeekCardsResponse, RevealTokenRequest, RevealTokenResponse, InitialDeckRequest, InitialDeckResponse, InitialCard, Proof, MaskDeck, RevealTokenDTO};
+use crate::deck::models::deck_case::deck::{SetUpDeckResponse, MaskResponse, ComputeAggregateKeyResponse, GenerateDeckRequest, GenerateDeckResponse, InitialDeck, MaskedCardAndProofDTO as CardDTO, ShuffleRequest, ShuffleResponse, VerifyShuffleRequest, VerifyShuffleResponse, ShuffledDeck, RevealCardsRequest, RevealCardsResponse, OpenCardsRequest, OpenCardsResponse, RevealedDeck, PeekCardsRequest, PeekCardsResponse, RevealTokenRequest, RevealTokenResponse, InitialDeckRequest, InitialDeckResponse, InitialCard, Proof, MaskDeck, RevealTokenDTO, PedersenProofDTO};
 use ark_serialize::{CanonicalSerialize,CanonicalDeserialize};
 use asn1_der::typed::DerEncodable;
 use starknet_curve::{Affine, StarkwareParameters};
-use crate::serialize::serialize::{encode_public_key, decode_public_key, decode_deck_public_key, decode_masked_card, encode_masked_card, encode_masking_proof, decode_shuffle_proof, encode_shuffle_proof, encode_initial_card, decode_initial_card, encode_revel_token, encode_revel_proof, decode_revel_token};
+use crate::serialize::serialize::{encode_public_key, decode_public_key, decode_deck_public_key, decode_masked_card, encode_masked_card, encode_masking_proof, decode_shuffle_proof, encode_shuffle_proof, encode_initial_card, decode_initial_card, encode_revel_token, encode_revel_proof, decode_revel_token, decode_revel_proof};
 
 use proof_essentials::homomorphic_encryption::{
     el_gamal, el_gamal::ElGamal, HomomorphicEncryptionScheme,
@@ -351,15 +351,20 @@ impl DeckServiceTrait for DeckService {
                 Ok(p) => p,
                 Err(_e)=> return Err(DeckCustomError::GenericError(String::from("Internal")))
             };
+
             let token = encode_revel_token(reveal_token.0)?;
-            let proof = encode_revel_proof(reveal_token.1)?;
+            let proof = PedersenProof::new(reveal_token.1);;
             let pub_key_hex = match encode_public_key(user_public_key){
                 Ok(p) => p,
                 Err(_e)=> return Err(DeckCustomError::InvalidPublicKey)
             };
             reveal_token_map.insert(card_dto, RevealTokenDTO{
                 token:token,
-                proof: proof,
+                proof: PedersenProofDTO{
+                    a: proof.a,
+                    b: proof.b,
+                    r:proof.r
+                },
                 public_key:pub_key_hex,
             });
         }
@@ -397,6 +402,15 @@ impl DeckServiceTrait for DeckService {
                 Ok(p) => p,
                 Err(_e)=> return Err(DeckCustomError::GenericError(String::from("Internal")))
             };
+
+            println!("origin proof{:?}", reveal_card.1.clone());
+            let proof_hex = encode_revel_proof(reveal_card.1.clone())?;
+            print!("proof_hex {:?}",proof_hex.clone());
+
+            let restored_proof = decode_revel_proof(proof_hex.clone())?;
+            println!("restored proof{:?}", restored_proof.clone());
+
+
             reveal_cards.push((masked_card,reveal_card.0,reveal_card.1));
         }
         let deck =match  RevealedDeck::new(reveal_cards){
@@ -427,32 +441,42 @@ impl DeckServiceTrait for DeckService {
         let user_private_key = user.private_key.clone();
         let user_public_key = user.public_key.clone();
 
-
+        let mut card_map  = HashMap::new();
         for card  in peek_cards_request.peek_cards{
-            let mask_card = decode_masked_card(card.card)?;
-            let mut tokens = Vec::with_capacity(card.tokens.len()+1);
-            for token in card.tokens {
-                let reveal_token = decode_revel_token(token)?;
-                tokens.push(reveal_token);
+            let mask_card = decode_masked_card(card.card.clone())?;
+            let mut tokens = Vec::with_capacity(card.reveal_tokens.len()+1);
+            for token in card.reveal_tokens {
+                let reveal_token = decode_revel_token(token.token)?;
+                let proof = PedersenProof{
+                    a: token.proof.a,
+                    b:token.proof.b,
+                    r:token.proof.r,
+                }.to_curve()?;
+                let pub_key = match decode_public_key(token.public_key){
+                    Ok(p) => p,
+                    Err(_e)=> return Err(DeckCustomError::GenericError(String::from("Internal")))
+                };
+                tokens.push((reveal_token,proof,pub_key));
             }
 
             let rng =   &mut thread_rng();
-            let (reveal_token, _reveal_proof) =
+            let (reveal_token, reveal_proof) =
                 match CardProtocol::compute_reveal_token(rng, &parameters, &user_private_key, &user_public_key, &mask_card){
                     Ok(p) => p,
                     Err(_e)=> return Err(DeckCustomError::SerializationError(String::from("Internal")))
                 };
-            tokens.push(reveal_token);
-
-            // let unmasked_card = CardProtocol::unmask(&parameters, &tokens, &mask_card)?;
-            // let opened_card = card_mappings.get(&unmasked_card);
-            // let opened_card = opened_card.ok_or(GameErrors::InvalidCard)?;
-            //
-            // self.opened_cards[i] = Some(*opened_card);
-            // Ok(())
+            tokens.push((reveal_token,reveal_proof,user_public_key));
+            let unmasked_card = match CardProtocol::unmask(&parameters, &tokens, &mask_card){
+                Ok(p) => p,
+                Err(_e)=> return Err(DeckCustomError::InvalidCard)
+            };
+            let card_hex = match encode_initial_card(unmasked_card){
+                Ok(p) => p,
+                Err(_e)=> return Err(DeckCustomError::InvalidCard)
+            };
+            card_map.insert(card.card.clone(), card_hex);
         }
 
-        let card_map  = HashMap::new();
         Ok(PeekCardsResponse{
             card_map: card_map,
         })
@@ -482,7 +506,7 @@ use proof_essentials::zkp::arguments::shuffle;
 use proof_essentials::zkp::proofs::{chaum_pedersen_dl_equality, schnorr_identification};
 use rocket::http::ext::IntoCollection;
 use crate::game_user::models::game_user::GameUser;
-use crate::serialize::proof::{IdentityProof};
+use crate::serialize::proof::{IdentityProof, PedersenProof};
 use crate::user::errors::CustomError;
 use crate::user::models::user::User;
 

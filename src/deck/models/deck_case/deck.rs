@@ -267,9 +267,9 @@ pub struct RevealTokenRequest {
 }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RevealTokenDTO{
-    pub token:String,
-    pub proof:String,
-    pub public_key:String,
+    pub token: String,
+    pub proof: PedersenProofDTO,
+    pub public_key: String,
 }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RevealTokenResponse {
@@ -340,7 +340,7 @@ impl RevealedDeck {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PeekCardInput{
     pub card: String,
-    pub tokens:Vec<String>,
+    pub reveal_tokens:Vec<RevealTokenDTO>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

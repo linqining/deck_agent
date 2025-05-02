@@ -140,6 +140,7 @@ pub fn decode_revel_token(token_hex :String)->Result<RevealToken, DeckCustomErro
 }
 
 pub fn encode_revel_proof(proof :RevealProof)->Result<String, DeckCustomError>{
+
     let mut bytes = Vec::new();
     if let Err(_e)= proof.serialize(&mut bytes){
         return Err(DeckCustomError::InvalidProof);
