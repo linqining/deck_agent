@@ -2,9 +2,10 @@ use ark_ec::AffineCurve;
 use ark_ec::short_weierstrass_jacobian::GroupAffine;
 use proof_essentials::zkp::proofs::{chaum_pedersen_dl_equality, schnorr_identification};
 use starknet_curve::StarkwareParameters;
+use ark_bn254::g1::Parameters as G1Parameters;
 
-type PublicKey = GroupAffine<StarkwareParameters>;
-type PrivateKey = <ark_ec::short_weierstrass_jacobian::GroupAffine<StarkwareParameters> as AffineCurve>::ScalarField;
+type PublicKey = GroupAffine<G1Parameters>;
+type PrivateKey = <ark_ec::short_weierstrass_jacobian::GroupAffine<G1Parameters> as AffineCurve>::ScalarField;
 
 type Curve = starknet_curve::Projective;
 type CardProtocol = barnett_smart_card_protocol::discrete_log_cards::DLCards<Curve>;

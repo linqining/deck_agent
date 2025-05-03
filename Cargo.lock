@@ -78,6 +78,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e16d2d3311acee920a9eb8d33b8cbc1787ce4a264e85f964c2404b969bdcd487"
 
 [[package]]
+name = "ark-bn254"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea691771ebbb28aea556c044e2e5c5227398d840cee0c34d4d20fa8eb2689e8c"
+dependencies = [
+ "ark-ec",
+ "ark-ff",
+ "ark-std",
+]
+
+[[package]]
 name = "ark-crypto-primitives"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -369,9 +380,10 @@ dependencies = [
 [[package]]
 name = "barnett-smart-card-protocol"
 version = "0.1.0"
-source = "git+https://github.com/linqining/mental-poker-rust.git?branch=develop#4535b9f2ca0116e37dc2cd6ea748a710b124bd1e"
+source = "git+https://github.com/linqining/mental-poker-rust.git?branch=dev-bn254-3#897d4092e606a28699fc2f9f539f3bdcb9cc4ab5"
 dependencies = [
  "anyhow",
+ "ark-bn254",
  "ark-crypto-primitives",
  "ark-ec",
  "ark-ff",
@@ -845,6 +857,7 @@ name = "example_api"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "ark-bn254",
  "ark-crypto-primitives",
  "ark-ec",
  "ark-ff",

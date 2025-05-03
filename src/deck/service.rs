@@ -13,7 +13,7 @@ use rocket::yansi::Paint;
 use crate::deck::models::deck_case::deck::{SetUpDeckResponse, MaskResponse, ComputeAggregateKeyResponse, GenerateDeckRequest, GenerateDeckResponse, InitialDeck, MaskedCardAndProofDTO as CardDTO, ShuffleRequest, ShuffleResponse, VerifyShuffleRequest, VerifyShuffleResponse, ShuffledDeck, RevealCardsRequest, RevealCardsResponse, OpenCardsRequest, OpenCardsResponse, RevealedDeck, PeekCardsRequest, PeekCardsResponse, RevealTokenRequest, RevealTokenResponse, InitialDeckRequest, InitialDeckResponse, InitialCard, Proof, MaskDeck, RevealTokenDTO, PedersenProofDTO};
 use ark_serialize::{CanonicalSerialize,CanonicalDeserialize};
 use asn1_der::typed::DerEncodable;
-use starknet_curve::{Affine, StarkwareParameters};
+use ark_bn254::g1::Parameters as G1Parameters;
 use crate::serialize::serialize::{encode_public_key, decode_public_key, decode_deck_public_key, decode_masked_card, encode_masked_card, encode_masking_proof, decode_shuffle_proof, encode_shuffle_proof, encode_initial_card, decode_initial_card, encode_revel_token, encode_revel_proof, decode_revel_token, decode_revel_proof};
 
 use proof_essentials::homomorphic_encryption::{
@@ -24,11 +24,12 @@ use serde::{Serialize, Deserialize};
 use rand::thread_rng;
 use crate::user::service::UserService;
 use ark_std::{rand::Rng, One};
-type Scalar = starknet_curve::Fr;
+type Scalar = ark_bn254::Fr;
+
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-type Curve = starknet_curve::Projective;
+type Curve = ark_bn254::G1Projective;
 type CardProtocol = barnett_smart_card_protocol::discrete_log_cards::DLCards<Curve>;
 type Card = barnett_smart_card_protocol::discrete_log_cards::Card<Curve>;
 
@@ -217,7 +218,7 @@ impl DeckServiceTrait for DeckService {
         let mut masked_cards  =  Vec::with_capacity(mask_req.cards.len());
         for card in mask_req.cards {
             let initial_card = decode_initial_card(card)?;
-            let masked_result =  <DLCards<ark_ec::short_weierstrass_jacobian::GroupProjective<StarkwareParameters>> as BarnettSmartProtocol>::mask(rng, &parameters, &joint_pk, &initial_card, &Scalar::one());
+            let masked_result =  <DLCards<ark_ec::short_weierstrass_jacobian::GroupProjective<G1Parameters>> as BarnettSmartProtocol>::mask(rng, &parameters, &joint_pk, &initial_card, &Scalar::one());
             let one_masked_card = match masked_result{
                 Ok(p)=>p,
                 Err(_e) => return Err(DeckCustomError::InvalidCard)

@@ -2,14 +2,16 @@ use ark_crypto_primitives::encryption::elgamal::ElGamal;
 use ark_ec::{AffineCurve, ProjectiveCurve};
 use ark_ec::short_weierstrass_jacobian::{GroupAffine, GroupProjective};
 use rocket::http::hyper::body::Buf;
-use starknet_curve::{Affine, Fr, StarkwareParameters};
 use ark_serialize::{CanonicalSerialize, CanonicalDeserialize, SerializationError};
 use barnett_smart_card_protocol::BarnettSmartProtocol;
 use barnett_smart_card_protocol::discrete_log_cards::DLCards;
 use bincode::Options;
 use hex::FromHex;
 
-type Curve = starknet_curve::Projective;
+use ark_bn254::{Fr,};
+use ark_bn254::g1::Parameters as G1Parameters;
+
+type Curve = ark_bn254::G1Projective;
 type CardProtocol = barnett_smart_card_protocol::discrete_log_cards::DLCards<Curve>;
 type Card = barnett_smart_card_protocol::discrete_log_cards::Card<Curve>;
 
@@ -23,10 +25,9 @@ type RevealProof = chaum_pedersen_dl_equality::proof::Proof<Curve>;
 
 type ZKProofKeyOwnership = schnorr_identification::proof::Proof<Curve>;
 
-type Parameters = <DLCards<ark_ec::short_weierstrass_jacobian::GroupProjective<StarkwareParameters>> as BarnettSmartProtocol>::Parameters;
-type PublicKey = GroupAffine<StarkwareParameters>;
-type PrivateKey = <ark_ec::short_weierstrass_jacobian::GroupAffine<StarkwareParameters> as AffineCurve>::ScalarField;
-
+type Parameters = <DLCards<ark_ec::short_weierstrass_jacobian::GroupProjective<G1Parameters>> as BarnettSmartProtocol>::Parameters;
+type PublicKey = GroupAffine<G1Parameters>;
+type PrivateKey = <ark_ec::short_weierstrass_jacobian::GroupAffine<G1Parameters> as AffineCurve>::ScalarField;
 
 
 
@@ -41,7 +42,7 @@ use crate::deck::errors::DeckCustomError;
 // type ZKProofShuffle = shuffle::proof::Proof<Fr, Self::Enc, Self::Comm>;
 type ZKShuffleProof =  Proof<Fr, proof_essentials::homomorphic_encryption::el_gamal::ElGamal<Curve>, proof_essentials::vector_commitment::pedersen::PedersenCommitment<Curve>>;
 
-pub fn decode_public_key(public_key: String) ->Result<GroupAffine<StarkwareParameters>, ark_serialize::SerializationError>{
+pub fn decode_public_key(public_key: String) ->Result<GroupAffine<G1Parameters>, ark_serialize::SerializationError>{
     let bytes = match Vec::from_hex(public_key){
         Ok(bytes) => bytes,
         Err(_err)    => return Err(ark_serialize::SerializationError::InvalidData)
@@ -50,7 +51,7 @@ pub fn decode_public_key(public_key: String) ->Result<GroupAffine<StarkwareParam
     restored_result
 }
 
-pub fn decode_deck_public_key(public_key: String) ->Result<GroupAffine<StarkwareParameters>, DeckCustomError>{
+pub fn decode_deck_public_key(public_key: String) ->Result<GroupAffine<G1Parameters>, DeckCustomError>{
     let bytes = match Vec::from_hex(public_key){
         Ok(bytes) => bytes,
         Err(_err)    => return Err(DeckCustomError::InvalidPublicKey)

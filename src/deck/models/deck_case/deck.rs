@@ -9,10 +9,12 @@ use proof_essentials::homomorphic_encryption::el_gamal;
 use proof_essentials::vector_commitment::pedersen;
 use proof_essentials::zkp::proofs::{chaum_pedersen_dl_equality, schnorr_identification};
 use serde::{Serialize, Deserialize};
-use starknet_curve::StarkwareParameters;
+
 use crate::card::classic_card::ClassicPlayingCard;
 
-type Curve = starknet_curve::Projective;
+use ark_bn254::g1::Parameters as G1Parameters;
+
+type Curve = ark_bn254::G1Projective;
 type CardProtocol = barnett_smart_card_protocol::discrete_log_cards::DLCards<Curve>;
 // type Card = barnett_smart_card_protocol::discrete_log_cards::Card<Curve>;
 
@@ -29,7 +31,7 @@ type MaskedCard = barnett_smart_card_protocol::discrete_log_cards::MaskedCard<Cu
 type RevealToken = barnett_smart_card_protocol::discrete_log_cards::RevealToken<Curve>;
 type Card = barnett_smart_card_protocol::discrete_log_cards::Card<Curve>;
 
-type Parameters = <DLCards<ark_ec::short_weierstrass_jacobian::GroupProjective<StarkwareParameters>> as BarnettSmartProtocol>::Parameters;
+type Parameters = <DLCards<ark_ec::short_weierstrass_jacobian::GroupProjective<G1Parameters>> as BarnettSmartProtocol>::Parameters;
 
 
 
