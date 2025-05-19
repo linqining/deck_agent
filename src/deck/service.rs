@@ -10,7 +10,7 @@ use rand_core::{CryptoRngCore, RngCore, SeedableRng};
 use rocket::data::ToByteUnit;
 use rocket::futures::TryFutureExt;
 use rocket::yansi::Paint;
-use crate::deck::models::deck_case::deck::{SetUpDeckResponse, MaskResponse, ComputeAggregateKeyResponse, GenerateDeckRequest, GenerateDeckResponse, InitialDeck, MaskedCardAndProofDTO as CardDTO, ShuffleRequest, ShuffleResponse, VerifyShuffleRequest, VerifyShuffleResponse, ShuffledDeck, RevealCardsRequest, RevealCardsResponse, OpenCardsRequest, OpenCardsResponse, RevealedDeck, PeekCardsRequest, PeekCardsResponse, RevealTokenRequest, RevealTokenResponse, InitialDeckRequest, InitialDeckResponse, InitialCard, Proof, MaskDeck, RevealTokenDTO, PedersenProofDTO};
+use crate::deck::models::deck_case::deck::{SetUpDeckResponse, MaskResponse, ComputeAggregateKeyResponse, GenerateDeckRequest, GenerateDeckResponse, InitialDeck, MaskedCardAndProofDTO as CardDTO, ShuffleRequest, ShuffleResponse, VerifyShuffleRequest, VerifyShuffleResponse, ShuffledDeck, RevealCardsRequest, RevealCardsResponse, OpenCardsRequest, OpenCardsResponse, RevealedDeck, PeekCardsRequest, PeekCardsResponse, RevealTokenRequest, RevealTokenResponse, InitialDeckRequest, InitialDeckResponse, InitialCard, Proof, MaskDeck, RevealTokenDTO, PedersenProofDTO, ClearRequest, ClearResponse};
 use ark_serialize::{CanonicalSerialize,CanonicalDeserialize};
 use asn1_der::typed::DerEncodable;
 use ark_bn254::g1::Parameters as G1Parameters;
@@ -62,6 +62,7 @@ pub trait DeckServiceTrait: Send + Sync {
     async fn initial_deck(&self,initial_deck: InitialDeckRequest)->Result<InitialDeckResponse, DeckCustomError>;
 
     async fn setup(&self,set_up: SetUpDeckRequest) -> Result<SetUpDeckResponse, DeckCustomError>;
+    async fn clear(&self,clear: ClearRequest) -> Result<ClearResponse, DeckCustomError>;
 
     async fn compute_aggregate_key(&self,compute_agg_key: ComputeAggregateKeyRequest)->Result<ComputeAggregateKeyResponse,DeckCustomError>;
 
@@ -143,7 +144,6 @@ impl DeckServiceTrait for DeckService {
         };
         let game_user = GameUser::new(set_up.game_user_id.clone(),set_up.user_id.clone(),pk,sk);
 
-        //TODO 用户对局信息存起来
         let pub_key = match encode_public_key(pk){
             Ok(p) => p,
             Err(_e)=> return Err(DeckCustomError::GenericError(String::from("Failed to serialize pk")))
@@ -155,7 +155,11 @@ impl DeckServiceTrait for DeckService {
             Err(_e)=> return Err(DeckCustomError::InvalidProof)
         };
         let proof_third = IdentityProof::new(proof);
-        self.user_db.lock().unwrap().insert(set_up.game_user_id.clone(), game_user);
+        let mut map = match self.user_db.lock(){
+            Ok(map) => map,
+            Err(_e)=> return Err(DeckCustomError::GenericError(String::from("Failed to lock user db")))
+        };
+        map.insert(set_up.game_user_id.clone(), game_user);
         Ok(SetUpDeckResponse{
             user_id:set_up.user_id,
             game_id:set_up.game_id,
@@ -167,6 +171,16 @@ impl DeckServiceTrait for DeckService {
             },
         })
     }
+
+    async  fn clear(&self,clear: ClearRequest) -> Result<ClearResponse, DeckCustomError>{
+        let mut map = match self.user_db.lock(){
+            Ok(map) => map,
+            Err(_e)=> return Err(DeckCustomError::GenericError(String::from("Failed to lock user db")))
+        };
+        map.remove(&clear.game_user_id.clone());
+        Ok(ClearResponse{})
+    }
+
     async fn compute_aggregate_key(&self,compute_agg_key_request: ComputeAggregateKeyRequest)->Result<ComputeAggregateKeyResponse,DeckCustomError> {
         let mut restored_rng = restore_rnd(compute_agg_key_request.seed_hex)?;
         let parameters = match CardProtocol::setup(&mut restored_rng, 2, 26){
@@ -223,6 +237,8 @@ impl DeckServiceTrait for DeckService {
                 Ok(p)=>p,
                 Err(_e) => return Err(DeckCustomError::InvalidCard)
             };
+
+
             masked_cards.push(one_masked_card);
         }
 

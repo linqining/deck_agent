@@ -91,6 +91,18 @@ pub struct SetUpDeckRequest{
     // pub m:usize,
     // pub n:usize,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ClearRequest{
+    pub user_id: String, // user_id provide by the agent service
+    pub game_id: String,
+    pub game_user_id: String, // user identity among this round
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ClearResponse {
+}
+
 #[derive(Debug,Clone, Serialize, Deserialize)]
 pub struct Proof{
     pub commit: String,

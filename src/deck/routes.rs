@@ -4,7 +4,7 @@ use rocket::{ State, http::Status};
 use rocket::futures::stream::Peek;
 use rocket::serde::json::Json;
 
-use crate::deck::models::deck_case::deck::{ComputeAggregateKeyRequest, ComputeAggregateKeyResponse, InitialDeckRequest, InitialDeckResponse, MaskRequest, MaskResponse, PeekCardsRequest, PeekCardsResponse, RevealTokenRequest, RevealTokenResponse, SetUpDeckRequest, SetUpDeckResponse, ShuffleRequest, ShuffleResponse, VerifyShuffleRequest, VerifyShuffleResponse};
+use crate::deck::models::deck_case::deck::{ClearRequest, ClearResponse, ComputeAggregateKeyRequest, ComputeAggregateKeyResponse, InitialDeckRequest, InitialDeckResponse, MaskRequest, MaskResponse, PeekCardsRequest, PeekCardsResponse, RevealTokenRequest, RevealTokenResponse, SetUpDeckRequest, SetUpDeckResponse, ShuffleRequest, ShuffleResponse, VerifyShuffleRequest, VerifyShuffleResponse};
 use crate::user::service::UserServiceTrait;
 use crate::core::api_response::ErrorResponse;
 use crate::deck::errors::DeckCustomError;
@@ -37,6 +37,33 @@ pub async fn setup(deck_service: &State<Box<dyn DeckServiceTrait>>, setup: Json<
         ..setup_response
     })))
 }
+
+#[post("/deck/clear", data = "<clear>")]
+pub async fn clear(deck_service: &State<Box<dyn DeckServiceTrait>>, clear: Json<ClearRequest>) -> Result<status::Custom<Json<ClearResponse>>, status::Custom<Json<ErrorResponse>>> {
+    let new_clear = ClearRequest {
+        ..clear.into_inner()
+    };
+
+    let clear_result = deck_service.clear(new_clear).await;
+
+    let clear_response = match clear_result {
+        Ok(response) => response,
+        Err(err) => {
+            match err {
+                DeckCustomError::GenericError(msg) => return Err(status::Custom(Status::InternalServerError, Json(ErrorResponse { message: msg }))),
+                DeckCustomError::MissingFields(msg) => return Err(status::Custom(Status::BadRequest, Json(ErrorResponse { message: format!("The following properties are required: {}", msg) }))),
+                DeckCustomError::InvalidPublicKey => return Err(status::Custom(Status::BadRequest,Json(ErrorResponse{message: format!("invalid public key")}))),
+                DeckCustomError::InvalidProof=>return Err(status::Custom(Status::BadRequest,Json(ErrorResponse{message: format!("invalid proof")}))),
+                _ => return Err(status::Custom(Status::InternalServerError, Json(ErrorResponse { message: err.to_string() }))),
+            }
+        }
+    };
+
+    Ok(status::Custom(Status::Created, Json(ClearResponse {
+        ..clear_response
+    })))
+}
+
 
 #[get("/deck/initialize")]
 pub async fn initialize(deck_service: &State<Box<dyn DeckServiceTrait>>, ) -> Result<status::Custom<Json<InitialDeckResponse>>, status::Custom<Json<ErrorResponse>>> {
